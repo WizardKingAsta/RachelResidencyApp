@@ -583,3 +583,65 @@ header h1 {
 .card-section h2 {
   font-weight: 900;
 }
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  padding: 18px 30px 0 30px;
+
+  overflow-x: auto;
+
+  position: relative;
+  z-index: 2;
+}
+
+.tab-button {
+  padding: 11px 18px;
+
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
+
+  font-weight: 600;
+  cursor: pointer;
+
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.tab-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tab-button.active {
+  color: white;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(114, 80, 255, 0.95),
+      rgba(239, 84, 183, 0.95)
+    );
+
+  box-shadow:
+    0 8px 24px rgba(119, 76, 255, 0.22),
+    0 8px 28px rgba(255, 82, 168, 0.14);
+}
+
+.tab-controls {
+  display: flex;
+  justify-content: flex-end;
+
+  padding: 20px 30px 0 30px;
+
+  position: relative;
+  z-index: 2;
+}
