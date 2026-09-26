@@ -1,13 +1,180 @@
-import { useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 
 import "./App.css";
+
+import { auth } from "./firebase.js";
 
 import CardPage from "./pages/card-page.jsx";
 import Tab from "./components/tab.jsx";
 import Column from "./components/column.jsx";
+
 import useBoard from "./hooks/useBoard.js";
 
+
+/*
+  APP
+  ----
+  Handles Firebase authentication only.
+
+  The actual board does not mount until
+  Firebase confirms that a user is signed in.
+*/
 export default function App() {
+  const [user, setUser] =
+    useState(null);
+
+  const [authLoading, setAuthLoading] =
+    useState(true);
+
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const [loginError, setLoginError] =
+    useState("");
+
+  useEffect(() => {
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        (firebaseUser) => {
+          setUser(firebaseUser);
+          setAuthLoading(false);
+        }
+      );
+
+    return unsubscribe;
+  }, []);
+
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+
+    setLoginError("");
+
+    try {
+      await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+    } catch (error) {
+      console.error(
+        "Login failed:",
+        error
+      );
+
+      setLoginError(
+        "Email or password is incorrect."
+      );
+    }
+  };
+
+
+  /*
+    Wait until Firebase has determined
+    whether a session already exists.
+  */
+  if (authLoading) {
+    return (
+      <div className="card-page">
+        <h1>Loading...</h1>
+      </div>
+    );
+  }
+
+
+  /*
+    No authenticated Firebase user:
+    show login page.
+  */
+  if (!user) {
+    return (
+      <div className="card-page">
+        <h1>
+          Dr. Rachel Pilanias Board
+        </h1>
+
+        <form
+          onSubmit={handleLogin}
+          className="add-column"
+          style={{
+            maxWidth: "400px",
+            flexDirection: "column",
+          }}
+        >
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) =>
+              setEmail(
+                e.target.value
+              )
+            }
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) =>
+              setPassword(
+                e.target.value
+              )
+            }
+          />
+
+          <button type="submit">
+            Sign In
+          </button>
+
+          {loginError && (
+            <p>
+              {loginError}
+            </p>
+          )}
+        </form>
+      </div>
+    );
+  }
+
+
+  /*
+    Authenticated:
+    now mount the actual board.
+
+    This is important because useBoard()
+    will not run until authentication
+    has succeeded.
+  */
+  return <BoardApp />;
+}
+
+
+/*
+  BOARD APP
+  ---------
+  Your existing application.
+
+  useBoard owns:
+  - tabs
+  - columns
+  - cards
+  - drag/drop
+  - Firestore persistence
+*/
+function BoardApp() {
   const {
     tabs,
     activeTabId,
@@ -31,39 +198,66 @@ export default function App() {
     handleDrop,
   } = useBoard();
 
-  const [newTabTitle, setNewTabTitle] =
-    useState("");
 
-  const [newColumnTitle, setNewColumnTitle] =
-    useState("");
+  const [
+    newTabTitle,
+    setNewTabTitle,
+  ] = useState("");
 
-  const [newCardTitles, setNewCardTitles] =
-    useState({});
+  const [
+    newColumnTitle,
+    setNewColumnTitle,
+  ] = useState("");
 
-  const hash = window.location.hash;
+  const [
+    newCardTitles,
+    setNewCardTitles,
+  ] = useState({});
 
-  if (hash.startsWith("#card/")) {
-    const cardTitle = decodeURIComponent(
-      window.location.hash.replace(
-        "#card/",
-        ""
-      )
-    );
+
+  /*
+    CARD PAGE ROUTING
+  */
+  const hash =
+    window.location.hash;
+
+  if (
+    hash.startsWith("#card/")
+  ) {
+    const cardTitle =
+      decodeURIComponent(
+        window.location.hash.replace(
+          "#card/",
+          ""
+        )
+      );
 
     return (
-      <CardPage cardTitle={cardTitle} />
+      <CardPage
+        cardTitle={cardTitle}
+      />
     );
   }
 
-  const goToCard = (cardTitle) => {
+
+  const goToCard = (
+    cardTitle
+  ) => {
     window.location.hash =
-      `card/${encodeURIComponent(cardTitle)}`;
+      `card/${encodeURIComponent(
+        cardTitle
+      )}`;
 
     window.location.reload();
   };
 
+
+  /*
+    ADD TAB UI HANDLER
+  */
   const handleAddTab = () => {
-    const title = newTabTitle.trim();
+    const title =
+      newTabTitle.trim();
 
     if (!title) return;
 
@@ -72,8 +266,13 @@ export default function App() {
     setNewTabTitle("");
   };
 
+
+  /*
+    ADD COLUMN UI HANDLER
+  */
   const handleAddColumn = () => {
-    const title = newColumnTitle.trim();
+    const title =
+      newColumnTitle.trim();
 
     if (!title) return;
 
@@ -82,9 +281,17 @@ export default function App() {
     setNewColumnTitle("");
   };
 
-  const handleAddCard = (columnId) => {
+
+  /*
+    ADD CARD UI HANDLER
+  */
+  const handleAddCard = (
+    columnId
+  ) => {
     const title =
-      newCardTitles[columnId]?.trim();
+      newCardTitles[
+        columnId
+      ]?.trim();
 
     if (!title) return;
 
@@ -93,11 +300,14 @@ export default function App() {
       title
     );
 
-    setNewCardTitles((prev) => ({
-      ...prev,
-      [columnId]: "",
-    }));
+    setNewCardTitles(
+      (prev) => ({
+        ...prev,
+        [columnId]: "",
+      })
+    );
   };
+
 
   return (
     <div className="app">
@@ -110,7 +320,9 @@ export default function App() {
           <input
             type="text"
             placeholder="New tab..."
-            value={newTabTitle}
+            value={
+              newTabTitle
+            }
             onChange={(e) =>
               setNewTabTitle(
                 e.target.value
@@ -118,7 +330,8 @@ export default function App() {
             }
             onKeyDown={(e) => {
               if (
-                e.key === "Enter"
+                e.key ===
+                "Enter"
               ) {
                 handleAddTab();
               }
@@ -126,41 +339,53 @@ export default function App() {
           />
 
           <button
-            onClick={handleAddTab}
+            onClick={
+              handleAddTab
+            }
           >
             + Add Tab
           </button>
         </div>
       </header>
 
+
       <div className="tabs">
-        {tabs.map((tab) => (
-          <Tab
-            key={tab.id}
-            tab={tab}
-            isActive={
-              tab.id === activeTabId
-            }
-            onSelect={
-              setActiveTabId
-            }
-            onRename={
-              renameTab
-            }
-            onDelete={
-              deleteTab
-            }
-          />
-        ))}
+        {tabs.map(
+          (tab) => (
+            <Tab
+              key={tab.id}
+              tab={tab}
+              isActive={
+                tab.id ===
+                activeTabId
+              }
+              onSelect={
+                setActiveTabId
+              }
+              onRename={
+                renameTab
+              }
+              onDelete={
+                deleteTab
+              }
+            />
+          )
+        )}
       </div>
+
 
       <main className="board-wrapper">
         <div className="board">
           {activeTab?.columns.map(
             (column) => (
               <Column
-                key={column.id}
-                column={column}
+                key={
+                  column.id
+                }
+
+                column={
+                  column
+                }
 
                 newCardTitle={
                   newCardTitles[
@@ -174,6 +399,7 @@ export default function App() {
                   setNewCardTitles(
                     (prev) => ({
                       ...prev,
+
                       [column.id]:
                         value,
                     })
@@ -214,6 +440,7 @@ export default function App() {
               />
             )
           )}
+
 
           {activeTab && (
             <div className="add-column-inline">

@@ -1,7 +1,6 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import {useEffect,useState,} from "react";
+import {doc,getDoc,setDoc,} from "firebase/firestore";
+import { rachel_db } from "../firebase.js";
 
 const initialTabs = [
   {
@@ -27,11 +26,6 @@ export default function useBoard() {
         return JSON.parse(savedTabs);
       }
 
-      /*
-        IMPORTANT:
-        Preserves data from the older
-        pre-tab version of the app.
-      */
       const oldColumns =
         localStorage.getItem(
           "columns"
@@ -65,19 +59,121 @@ export default function useBoard() {
     );
   });
 
+  const [
+    firebaseLoaded,
+    setFirebaseLoaded,
+  ] = useState(false);
+
+  /*
+    LOAD FROM FIREBASE ON STARTUP
+
+    Firebase is treated as the source
+    of truth if a board already exists.
+  */
   useEffect(() => {
+    const loadBoard = async () => {
+      try {
+        const snapshot =
+          await getDoc(
+            doc(
+              rachel_db,
+              "boards",
+              "main"
+            )
+          );
+        
+        if (snapshot.exists()) {
+          const data =
+            snapshot.data();
+
+          if (data.tabs) {
+            setTabs(
+              data.tabs
+            );
+          }
+
+          if (
+            data.activeTabId
+          ) {
+            setActiveTabId(
+              data.activeTabId
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Could not load board from Firebase:",
+          error
+        );
+
+        /*
+          IMPORTANT:
+          If Firebase fails,
+          the localStorage state
+          loaded above remains usable.
+        */
+      } finally {
+        setFirebaseLoaded(
+          true
+        );
+      }
+    };
+
+    loadBoard();
+  }, []);
+
+  /*
+    SAVE LOCALLY + FIREBASE
+
+    IMPORTANT:
+    Do not save until Firebase has
+    finished its initial load.
+
+    Otherwise your local/default state
+    could overwrite existing cloud data.
+  */
+  useEffect(() => {
+    if (!firebaseLoaded) {
+      return;
+    }
+
     localStorage.setItem(
       "tabs",
       JSON.stringify(tabs)
     );
-  }, [tabs]);
 
-  useEffect(() => {
     localStorage.setItem(
       "activeTabId",
       activeTabId
     );
-  }, [activeTabId]);
+
+    const saveBoard = async () => {
+      try {
+        await setDoc(
+          doc(
+            rachel_db,
+            "boards",
+            "main"
+          ),
+          {
+            tabs,
+            activeTabId,
+          }
+        );
+      } catch (error) {
+        console.error(
+          "Could not save board to Firebase:",
+          error
+        );
+      }
+    };
+
+    saveBoard();
+  }, [
+    tabs,
+    activeTabId,
+    firebaseLoaded,
+  ]);
 
   const activeTab =
     tabs.find(
@@ -113,7 +209,9 @@ export default function useBoard() {
     );
   };
 
-  const deleteTab = (tabId) => {
+  const deleteTab = (
+    tabId
+  ) => {
     const tab =
       tabs.find(
         (tab) =>
@@ -127,7 +225,9 @@ export default function useBoard() {
         `Delete "${tab.title}" and all of its columns and cards?`
       );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     const remainingTabs =
       tabs.filter(
@@ -177,7 +277,9 @@ export default function useBoard() {
   const addColumn = (
     title
   ) => {
-    if (!activeTabId) return;
+    if (!activeTabId) {
+      return;
+    }
 
     const newColumn = {
       id: crypto.randomUUID(),
@@ -212,14 +314,18 @@ export default function useBoard() {
           columnId
       );
 
-    if (!column) return;
+    if (!column) {
+      return;
+    }
 
     const confirmed =
       window.confirm(
         `Delete "${column.title}" and all cards inside it?`
       );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     setTabs((prev) =>
       prev.map((tab) =>
@@ -300,7 +406,8 @@ export default function useBoard() {
                             ...column.cards,
 
                             {
-                              id: crypto.randomUUID(),
+                              id:
+                                crypto.randomUUID(),
                               title,
                             },
                           ],
@@ -323,7 +430,9 @@ export default function useBoard() {
         `Delete "${cardTitle}"?`
       );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     setTabs((prev) =>
       prev.map((tab) =>
@@ -356,6 +465,11 @@ export default function useBoard() {
       )
     );
 
+    /*
+      IMPORTANT:
+      Card notes are still currently
+      stored separately in localStorage.
+    */
     localStorage.removeItem(
       `card-notes-${cardTitle}`
     );
@@ -410,11 +524,10 @@ export default function useBoard() {
 
     /*
       IMPORTANT:
-      Notes currently use the card title
-      as their storage key.
+      Notes currently use card title
+      as their localStorage key.
 
-      Renaming the card therefore also
-      moves its notes.
+      Preserve them when renaming.
     */
     const oldKey =
       `card-notes-${oldTitle}`;
@@ -472,7 +585,9 @@ export default function useBoard() {
         "application/json"
       );
 
-    if (!dragData) return;
+    if (!dragData) {
+      return;
+    }
 
     const {
       cardId,
@@ -583,5 +698,7 @@ export default function useBoard() {
 
     handleDragStart,
     handleDrop,
+
+    firebaseLoaded,
   };
 }

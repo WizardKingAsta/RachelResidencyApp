@@ -13,6 +13,7 @@
     "@tanstack/query-sync-storage-persister": "^5.103.3",
     "@tanstack/react-query": "^5.103.3",
     "dependencies": "^0.0.1",
+    "firebase": "^12.19.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.4"
