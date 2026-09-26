@@ -1,11 +1,4 @@
 import { useEffect, useState } from "react";
-import {
-  doc,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
-
-import { db } from "./firebase";
 import "./App.css";
 
 const initialTabs = [
