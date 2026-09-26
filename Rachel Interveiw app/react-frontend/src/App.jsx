@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+
 import "./App.css";
-import  CardPage from "./pages/card-page.jsx"
-import {} from "./components/card.jsx"
+
+import CardPage from "./pages/card-page.jsx";
+import Tab from "./components/tab.jsx";
+import Column from "./components/column.jsx";
 
 const initialTabs = [
   {
@@ -19,15 +22,13 @@ const initialTabs = [
 
 export default function App() {
   const [tabs, setTabs] = useState(() => {
-    const savedTabs =
-      localStorage.getItem("tabs");
+    const savedTabs = localStorage.getItem("tabs");
 
     if (savedTabs) {
       return JSON.parse(savedTabs);
     }
 
-    const oldColumns =
-      localStorage.getItem("columns");
+    const oldColumns = localStorage.getItem("columns");
 
     if (oldColumns) {
       return [
@@ -42,13 +43,12 @@ export default function App() {
     return initialTabs;
   });
 
-  const [activeTabId, setActiveTabId] =
-    useState(() => {
-      return (
-        localStorage.getItem("activeTabId") ||
-        "main"
-      );
-    });
+  const [activeTabId, setActiveTabId] = useState(() => {
+    return (
+      localStorage.getItem("activeTabId") ||
+      "main"
+    );
+  });
 
   const [newCardTitles, setNewCardTitles] =
     useState({});
@@ -57,19 +57,6 @@ export default function App() {
     useState("");
 
   const [newTabTitle, setNewTabTitle] =
-    useState("");
-
-  // NEW: inline editing state
-  const [editingTabId, setEditingTabId] =
-    useState(null);
-
-  const [editingColumnId, setEditingColumnId] =
-    useState(null);
-
-  const [editingCardId, setEditingCardId] =
-    useState(null);
-
-  const [editText, setEditText] =
     useState("");
 
   useEffect(() => {
@@ -164,13 +151,13 @@ export default function App() {
     }
   };
 
-  const renameTab = (tabId) => {
-    const title = editText.trim();
+  const renameTab = (
+    tabId,
+    newTitle
+  ) => {
+    const title = newTitle.trim();
 
-    if (!title) {
-      setEditingTabId(null);
-      return;
-    }
+    if (!title) return;
 
     setTabs((prev) =>
       prev.map((tab) =>
@@ -181,9 +168,7 @@ export default function App() {
             }
           : tab
       )
-    ); // IMPORTANT: updates only the selected tab title
-
-    setEditingTabId(null);
+    );
   };
 
   const addColumn = () => {
@@ -243,13 +228,13 @@ export default function App() {
     );
   };
 
-  const renameColumn = (columnId) => {
-    const title = editText.trim();
+  const renameColumn = (
+    columnId,
+    newTitle
+  ) => {
+    const title = newTitle.trim();
 
-    if (!title) {
-      setEditingColumnId(null);
-      return;
-    }
+    if (!title) return;
 
     setTabs((prev) =>
       prev.map((tab) =>
@@ -268,9 +253,7 @@ export default function App() {
             }
           : tab
       )
-    ); // IMPORTANT: updates only the selected column title
-
-    setEditingColumnId(null);
+    );
   };
 
   const addCard = (columnId) => {
@@ -352,14 +335,12 @@ export default function App() {
   const renameCard = (
     columnId,
     cardId,
-    oldTitle
+    oldTitle,
+    newTitle
   ) => {
-    const title = editText.trim();
+    const title = newTitle.trim();
 
-    if (!title) {
-      setEditingCardId(null);
-      return;
-    }
+    if (!title) return;
 
     setTabs((prev) =>
       prev.map((tab) =>
@@ -387,11 +368,8 @@ export default function App() {
             }
           : tab
       )
-    ); // IMPORTANT: updates only this card's title
+    );
 
-    // IMPORTANT:
-    // Your notes are currently stored using the title,
-    // so move them to the new title too.
     const oldKey =
       `card-notes-${oldTitle}`;
 
@@ -414,8 +392,6 @@ export default function App() {
         oldKey
       );
     }
-
-    setEditingCardId(null);
   };
 
   const handleDragStart = (
@@ -557,394 +533,91 @@ export default function App() {
 
       <div className="tabs">
         {tabs.map((tab) => (
-          <div
+          <Tab
             key={tab.id}
-            className={`tab-button ${
+            tab={tab}
+            isActive={
               tab.id === activeTabId
-                ? "active"
-                : ""
-            }`}
-            onClick={() =>
-              setActiveTabId(tab.id)
             }
-          >
-            {editingTabId ===
-            tab.id ? (
-              <input
-                className="inline-edit"
-                autoFocus
-                value={editText}
-                onChange={(e) =>
-                  setEditText(
-                    e.target.value
-                  )
-                }
-                onBlur={() =>
-                  renameTab(tab.id)
-                }
-                onKeyDown={(e) => {
-                  if (
-                    e.key ===
-                    "Enter"
-                  ) {
-                    renameTab(
-                      tab.id
-                    );
-                  }
-
-                  if (
-                    e.key ===
-                    "Escape"
-                  ) {
-                    setEditingTabId(
-                      null
-                    );
-                  }
-                }}
-                onClick={(e) =>
-                  e.stopPropagation()
-                }
-              />
-            ) : (
-              <span
-                onDoubleClick={(
-                  e
-                ) => {
-                  e.stopPropagation();
-
-                  setEditingTabId(
-                    tab.id
-                  );
-
-                  setEditText(
-                    tab.title
-                  );
-                }}
-              >
-                {tab.title}
-              </span>
-            )}
-
-            <button
-              className="delete-button"
-              onClick={(e) => {
-                e.stopPropagation();
-
-                deleteTab(
-                  tab.id
-                );
-              }}
-              title="Delete tab"
-            >
-              ×
-            </button>
-          </div>
+            onSelect={setActiveTabId}
+            onRename={renameTab}
+            onDelete={deleteTab}
+          />
         ))}
       </div>
 
       <main className="board-wrapper">
-        {activeTab && (
-          <div className="tab-controls">
-            
-          </div>
-        )}
-
         <div className="board">
           {activeTab?.columns.map(
             (column) => (
-              <section
+              <Column
                 key={column.id}
-                className="column"
-                onDragOver={(e) =>
-                  e.preventDefault()
-                }
-                onDrop={(e) =>
-                  handleDrop(
-                    e,
+                column={column}
+                newCardTitle={
+                  newCardTitles[
                     column.id
+                  ] || ""
+                }
+                onNewCardTitleChange={(
+                  value
+                ) =>
+                  setNewCardTitles(
+                    (prev) => ({
+                      ...prev,
+                      [column.id]:
+                        value,
+                    })
                   )
                 }
-              >
-                
-                <div className="column-header">
-                  {editingColumnId ===
-                  column.id ? (
-                    <input
-                      className="inline-edit"
-                      autoFocus
-                      value={
-                        editText
-                      }
-                      onChange={(
-                        e
-                      ) =>
-                        setEditText(
-                          e.target
-                            .value
-                        )
-                      }
-                      onBlur={() =>
-                        renameColumn(
-                          column.id
-                        )
-                      }
-                      onKeyDown={(
-                        e
-                      ) => {
-                        if (
-                          e.key ===
-                          "Enter"
-                        ) {
-                          renameColumn(
-                            column.id
-                          );
-                        }
-
-                        if (
-                          e.key ===
-                          "Escape"
-                        ) {
-                          setEditingColumnId(
-                            null
-                          );
-                        }
-                      }}
-                    />
-                  ) : (
-                    <h2
-                      onDoubleClick={() => {
-                        setEditingColumnId(
-                          column.id
-                        );
-
-                        setEditText(
-                          column.title
-                        );
-                      }}
-                    >
-                      {
-                        column.title
-                      }
-                    </h2>
-                  )}
-                  
-                  <div className="column-header-actions">
-                    <span>
-                      {
-                        column.cards
-                          .length
-                      }
-                    </span>
-
-                    <button
-                      className="delete-button"
-                      onClick={() =>
-                        deleteColumn(
-                          column.id
-                        )
-                      }
-                      title="Delete column"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-                      
-                <div className="cards">
-                  {column.cards.map(
-                    (card) => (
-                      <div
-                        key={card.id}
-                        className="card"
-                        draggable={
-                          editingCardId !==
-                          card.id
-                        }
-                        onDragStart={(
-                          e
-                        ) =>
-                          handleDragStart(
-                            e,
-                            card.id,
-                            column.id
-                          )
-                        }
-                      >
-                        
-                        {editingCardId ===
-                        card.id ? (
-                          <input
-                            className="inline-edit"
-                            autoFocus
-                            value={
-                              editText
-                            }
-                            onChange={(
-                              e
-                            ) =>
-                              setEditText(
-                                e
-                                  .target
-                                  .value
-                              )
-                            }
-                            onBlur={() =>
-                              renameCard(
-                                column.id,
-                                card.id,
-                                card.title
-                              )
-                            }
-                            onKeyDown={(
-                              e
-                            ) => {
-                              if (
-                                e.key ===
-                                "Enter"
-                              ) {
-                                renameCard(
-                                  column.id,
-                                  card.id,
-                                  card.title
-                                );
-                              }
-
-                              if (
-                                e.key ===
-                                "Escape"
-                              ) {
-                                setEditingCardId(
-                                  null
-                                );
-                              }
-                            }}
-                            onClick={(
-                              e
-                            ) =>
-                              e.stopPropagation()
-                            }
-                          />
-                        ) : (
-                          <span
-                            onDoubleClick={(
-                              e
-                            ) => {
-                              e.stopPropagation();
-
-                              setEditingCardId(
-                                card.id
-                              );
-
-                              setEditText(
-                                card.title
-                              );
-                            }}
-                          >
-                            {
-                              card.title
-                            }
-                          </span>
-                        )}
-
-                        <div className="card-actions">
-                          <button
-                            className="delete-button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-
-                              deleteCard(
-                                column.id,
-                                card.id,
-                                card.title
-                              );
-                            }}
-                            title="Delete card"
-                          >
-                            ×
-                          </button>
-
-                          <button
-                            className="card-arrow"
-                            onClick={(e) => {
-                              e.stopPropagation();
-
-                              goToCard(
-                                card.title
-                              );
-                            }}
-                          >
-                            →
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  )}
-                </div>
-
-                <div className="add-card">
-                  <input
-                    type="text"
-                    placeholder="Add a card..."
-                    value={
-                      newCardTitles[
-                        column.id
-                      ] || ""
-                    }
-                    onChange={(e) =>
-                      setNewCardTitles(
-                        (prev) => ({
-                          ...prev,
-
-                          [column.id]:
-                            e.target
-                              .value,
-                        })
-                      )
-                    }
-                    onKeyDown={(e) => {
-                      if (
-                        e.key ===
-                        "Enter"
-                      ) {
-                        addCard(
-                          column.id
-                        );
-                      }
-                    }}
-                  />
-
-                  <button
-                    onClick={() =>
-                      addCard(
-                        column.id
-                      )
-                    }
-                  >
-                    Add
-                  </button>
-                </div>
-              </section>
+                onAddCard={addCard}
+                onRenameColumn={
+                  renameColumn
+                }
+                onDeleteColumn={
+                  deleteColumn
+                }
+                onRenameCard={
+                  renameCard
+                }
+                onDeleteCard={
+                  deleteCard
+                }
+                onOpenCard={
+                  goToCard
+                }
+                onDragStart={
+                  handleDragStart
+                }
+                onDrop={handleDrop}
+              />
             )
           )}
-          <div className="add-column-inline">
-  <div className="add-column">
-    <input
-      type="text"
-      placeholder="New column..."
-      value={newColumnTitle}
-      onChange={(e) => setNewColumnTitle(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          addColumn();
-        }
-      }}
-    />
 
-    <button onClick={addColumn}>
-      + Add Column
-    </button>
-  </div>
-</div>
+          <div className="add-column-inline">
+            <div className="add-column">
+              <input
+                type="text"
+                placeholder="New column..."
+                value={newColumnTitle}
+                onChange={(e) =>
+                  setNewColumnTitle(
+                    e.target.value
+                  )
+                }
+                onKeyDown={(e) => {
+                  if (
+                    e.key === "Enter"
+                  ) {
+                    addColumn();
+                  }
+                }}
+              />
+
+              <button onClick={addColumn}>
+                + Add Column
+              </button>
+            </div>
+          </div>
         </div>
       </main>
     </div>
