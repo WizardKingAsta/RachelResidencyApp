@@ -12,6 +12,7 @@ import "./App.css";
 
 import { auth } from "./firebase.js";
 
+
 import CardPage from "./pages/card-page.jsx";
 import Tab from "./components/tab.jsx";
 import Column from "./components/column.jsx";
@@ -28,6 +29,7 @@ import useBoard from "./hooks/useBoard.js";
   Firebase confirms that a user is signed in.
 */
 export default function App() {
+  const loading_paths = ["../public/Anika_loading.png","../public/Kai_loading.png"];
   const [user, setUser] =
     useState(null);
 
@@ -86,12 +88,19 @@ export default function App() {
     whether a session already exists.
   */
   if (authLoading) {
-    return (
-      <div className="card-page">
-        <h1>Loading...</h1>
-      </div>
-    );
-  }
+    const rand_pic = Math.floor(Math.random() * (2 + 1));
+  return (
+    <div className="card-page loading-page">
+      <img
+        src={loading_paths[rand_pic]}
+        alt="Loading"
+        className="loading-image"
+      />
+
+      <h1>Loading...</h1>
+    </div>
+  );
+}
 
 
   /*
