@@ -645,3 +645,35 @@ header h1 {
   position: relative;
   z-index: 2;
 }
+.delete-button {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+
+  font-size: 18px;
+  line-height: 1;
+
+  cursor: pointer;
+
+  padding: 4px 6px;
+
+  border-radius: 8px;
+}
+
+.delete-button:hover {
+  color: #ff79b9;
+  background: rgba(255, 121, 185, 0.1);
+}
+
+.card-actions,
+.column-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tabs .tab-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

@@ -1,8 +1,25 @@
 import { useEffect, useState } from "react";
+import {
+  doc,
+  getDoc,
+  setDoc,
+} from "firebase/firestore";
 
+import { db } from "./firebase";
 import "./App.css";
 
 const initialTabs = [
+  {
+    id: "main",
+    title: "Residency Programs",
+    columns: [
+      {
+        id: "todo",
+        title: "Programs Applied To",
+        cards: [],
+      },
+    ],
+  },
 ];
 
 function CardPage({ cardTitle }) {
@@ -122,11 +139,6 @@ export default function App() {
       return JSON.parse(savedTabs);
     }
 
-    /*
-      IMPORTANT:
-      This keeps your OLD saved columns instead
-      of throwing them away when upgrading to tabs.
-    */
     const oldColumns =
       localStorage.getItem("columns");
 
@@ -160,6 +172,19 @@ export default function App() {
   const [newTabTitle, setNewTabTitle] =
     useState("");
 
+  // NEW: inline editing state
+  const [editingTabId, setEditingTabId] =
+    useState(null);
+
+  const [editingColumnId, setEditingColumnId] =
+    useState(null);
+
+  const [editingCardId, setEditingCardId] =
+    useState(null);
+
+  const [editText, setEditText] =
+    useState("");
+
   useEffect(() => {
     localStorage.setItem(
       "tabs",
@@ -178,7 +203,6 @@ export default function App() {
     (tab) => tab.id === activeTabId
   );
 
-  // Check whether URL is pointing at a card
   const hash = window.location.hash;
 
   if (hash.startsWith("#card/")) {
@@ -227,6 +251,54 @@ export default function App() {
     setNewTabTitle("");
   };
 
+  const deleteTab = (tabId) => {
+    const tab = tabs.find(
+      (tab) => tab.id === tabId
+    );
+
+    if (!tab) return;
+
+    const confirmed = window.confirm(
+      `Delete "${tab.title}" and all of its columns and cards?`
+    );
+
+    if (!confirmed) return;
+
+    const remainingTabs = tabs.filter(
+      (tab) => tab.id !== tabId
+    );
+
+    setTabs(remainingTabs);
+
+    if (activeTabId === tabId) {
+      setActiveTabId(
+        remainingTabs[0]?.id || ""
+      );
+    }
+  };
+
+  const renameTab = (tabId) => {
+    const title = editText.trim();
+
+    if (!title) {
+      setEditingTabId(null);
+      return;
+    }
+
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === tabId
+          ? {
+              ...tab,
+              title,
+            }
+          : tab
+      )
+    ); // IMPORTANT: updates only the selected tab title
+
+    setEditingTabId(null);
+  };
+
   const addColumn = () => {
     const title =
       newColumnTitle.trim();
@@ -251,9 +323,67 @@ export default function App() {
             }
           : tab
       )
-    ); // IMPORTANT: adds column only to active tab
+    );
 
     setNewColumnTitle("");
+  };
+
+  const deleteColumn = (columnId) => {
+    const column = activeTab?.columns.find(
+      (column) => column.id === columnId
+    );
+
+    if (!column) return;
+
+    const confirmed = window.confirm(
+      `Delete "${column.title}" and all cards inside it?`
+    );
+
+    if (!confirmed) return;
+
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              columns: tab.columns.filter(
+                (column) =>
+                  column.id !== columnId
+              ),
+            }
+          : tab
+      )
+    );
+  };
+
+  const renameColumn = (columnId) => {
+    const title = editText.trim();
+
+    if (!title) {
+      setEditingColumnId(null);
+      return;
+    }
+
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              columns: tab.columns.map(
+                (column) =>
+                  column.id === columnId
+                    ? {
+                        ...column,
+                        title,
+                      }
+                    : column
+              ),
+            }
+          : tab
+      )
+    ); // IMPORTANT: updates only the selected column title
+
+    setEditingColumnId(null);
   };
 
   const addCard = (columnId) => {
@@ -285,12 +415,120 @@ export default function App() {
             }
           : tab
       )
-    ); // IMPORTANT: adds card only inside active tab
+    );
 
     setNewCardTitles((prev) => ({
       ...prev,
       [columnId]: "",
     }));
+  };
+
+  const deleteCard = (
+    columnId,
+    cardId,
+    cardTitle
+  ) => {
+    const confirmed = window.confirm(
+      `Delete "${cardTitle}"?`
+    );
+
+    if (!confirmed) return;
+
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              columns: tab.columns.map(
+                (column) =>
+                  column.id === columnId
+                    ? {
+                        ...column,
+                        cards:
+                          column.cards.filter(
+                            (card) =>
+                              card.id !== cardId
+                          ),
+                      }
+                    : column
+              ),
+            }
+          : tab
+      )
+    );
+
+    localStorage.removeItem(
+      `card-notes-${cardTitle}`
+    );
+  };
+
+  const renameCard = (
+    columnId,
+    cardId,
+    oldTitle
+  ) => {
+    const title = editText.trim();
+
+    if (!title) {
+      setEditingCardId(null);
+      return;
+    }
+
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              columns: tab.columns.map(
+                (column) =>
+                  column.id === columnId
+                    ? {
+                        ...column,
+                        cards:
+                          column.cards.map(
+                            (card) =>
+                              card.id === cardId
+                                ? {
+                                    ...card,
+                                    title,
+                                  }
+                                : card
+                          ),
+                      }
+                    : column
+              ),
+            }
+          : tab
+      )
+    ); // IMPORTANT: updates only this card's title
+
+    // IMPORTANT:
+    // Your notes are currently stored using the title,
+    // so move them to the new title too.
+    const oldKey =
+      `card-notes-${oldTitle}`;
+
+    const newKey =
+      `card-notes-${title}`;
+
+    const savedNotes =
+      localStorage.getItem(oldKey);
+
+    if (
+      savedNotes &&
+      oldTitle !== title
+    ) {
+      localStorage.setItem(
+        newKey,
+        savedNotes
+      );
+
+      localStorage.removeItem(
+        oldKey
+      );
+    }
+
+    setEditingCardId(null);
   };
 
   const handleDragStart = (
@@ -395,7 +633,7 @@ export default function App() {
           ),
         };
       })
-    ); // IMPORTANT: cards only move within active tab
+    );
   };
 
   return (
@@ -405,7 +643,6 @@ export default function App() {
           Dr. Rachel Pilanias Board
         </h1>
 
-        {/* TOP RIGHT IS NOW ADD TAB */}
         <div className="add-column">
           <input
             type="text"
@@ -431,10 +668,9 @@ export default function App() {
         </div>
       </header>
 
-      {/* TAB BAR */}
       <div className="tabs">
         {tabs.map((tab) => (
-          <button
+          <div
             key={tab.id}
             className={`tab-button ${
               tab.id === activeTabId
@@ -445,41 +681,113 @@ export default function App() {
               setActiveTabId(tab.id)
             }
           >
-            {tab.title}
-          </button>
+            {editingTabId ===
+            tab.id ? (
+              <input
+                className="inline-edit"
+                autoFocus
+                value={editText}
+                onChange={(e) =>
+                  setEditText(
+                    e.target.value
+                  )
+                }
+                onBlur={() =>
+                  renameTab(tab.id)
+                }
+                onKeyDown={(e) => {
+                  if (
+                    e.key ===
+                    "Enter"
+                  ) {
+                    renameTab(
+                      tab.id
+                    );
+                  }
+
+                  if (
+                    e.key ===
+                    "Escape"
+                  ) {
+                    setEditingTabId(
+                      null
+                    );
+                  }
+                }}
+                onClick={(e) =>
+                  e.stopPropagation()
+                }
+              />
+            ) : (
+              <span
+                onDoubleClick={(
+                  e
+                ) => {
+                  e.stopPropagation();
+
+                  setEditingTabId(
+                    tab.id
+                  );
+
+                  setEditText(
+                    tab.title
+                  );
+                }}
+              >
+                {tab.title}
+              </span>
+            )}
+
+            <button
+              className="delete-button"
+              onClick={(e) => {
+                e.stopPropagation();
+
+                deleteTab(
+                  tab.id
+                );
+              }}
+              title="Delete tab"
+            >
+              ×
+            </button>
+          </div>
         ))}
       </div>
 
       <main className="board-wrapper">
-
-        {/* ADD COLUMN NOW BELONGS TO THE ACTIVE TAB */}
-        <div className="tab-controls">
-          <div className="add-column">
-            <input
-              type="text"
-              placeholder="New column..."
-              value={newColumnTitle}
-              onChange={(e) =>
-                setNewColumnTitle(
-                  e.target.value
-                )
-              }
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter"
-                ) {
-                  addColumn();
+        {activeTab && (
+          <div className="tab-controls">
+            <div className="add-column">
+              <input
+                type="text"
+                placeholder="New column..."
+                value={
+                  newColumnTitle
                 }
-              }}
-            />
+                onChange={(e) =>
+                  setNewColumnTitle(
+                    e.target.value
+                  )
+                }
+                onKeyDown={(e) => {
+                  if (
+                    e.key ===
+                    "Enter"
+                  ) {
+                    addColumn();
+                  }
+                }}
+              />
 
-            <button
-              onClick={addColumn}
-            >
-              + Add Column
-            </button>
+              <button
+                onClick={addColumn}
+              >
+                + Add Column
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="board">
           {activeTab?.columns.map(
@@ -498,16 +806,87 @@ export default function App() {
                 }
               >
                 <div className="column-header">
-                  <h2>
-                    {column.title}
-                  </h2>
+                  {editingColumnId ===
+                  column.id ? (
+                    <input
+                      className="inline-edit"
+                      autoFocus
+                      value={
+                        editText
+                      }
+                      onChange={(
+                        e
+                      ) =>
+                        setEditText(
+                          e.target
+                            .value
+                        )
+                      }
+                      onBlur={() =>
+                        renameColumn(
+                          column.id
+                        )
+                      }
+                      onKeyDown={(
+                        e
+                      ) => {
+                        if (
+                          e.key ===
+                          "Enter"
+                        ) {
+                          renameColumn(
+                            column.id
+                          );
+                        }
 
-                  <span>
-                    {
-                      column.cards
-                        .length
-                    }
-                  </span>
+                        if (
+                          e.key ===
+                          "Escape"
+                        ) {
+                          setEditingColumnId(
+                            null
+                          );
+                        }
+                      }}
+                    />
+                  ) : (
+                    <h2
+                      onDoubleClick={() => {
+                        setEditingColumnId(
+                          column.id
+                        );
+
+                        setEditText(
+                          column.title
+                        );
+                      }}
+                    >
+                      {
+                        column.title
+                      }
+                    </h2>
+                  )}
+
+                  <div className="column-header-actions">
+                    <span>
+                      {
+                        column.cards
+                          .length
+                      }
+                    </span>
+
+                    <button
+                      className="delete-button"
+                      onClick={() =>
+                        deleteColumn(
+                          column.id
+                        )
+                      }
+                      title="Delete column"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
 
                 <div className="cards">
@@ -516,7 +895,10 @@ export default function App() {
                       <div
                         key={card.id}
                         className="card"
-                        draggable
+                        draggable={
+                          editingCardId !==
+                          card.id
+                        }
                         onDragStart={(
                           e
                         ) =>
@@ -527,24 +909,111 @@ export default function App() {
                           )
                         }
                       >
-                        <span>
-                          {card.title}
-                        </span>
+                        {editingCardId ===
+                        card.id ? (
+                          <input
+                            className="inline-edit"
+                            autoFocus
+                            value={
+                              editText
+                            }
+                            onChange={(
+                              e
+                            ) =>
+                              setEditText(
+                                e
+                                  .target
+                                  .value
+                              )
+                            }
+                            onBlur={() =>
+                              renameCard(
+                                column.id,
+                                card.id,
+                                card.title
+                              )
+                            }
+                            onKeyDown={(
+                              e
+                            ) => {
+                              if (
+                                e.key ===
+                                "Enter"
+                              ) {
+                                renameCard(
+                                  column.id,
+                                  card.id,
+                                  card.title
+                                );
+                              }
 
-                        <button
-                          className="card-arrow"
-                          onClick={(
-                            e
-                          ) => {
-                            e.stopPropagation();
+                              if (
+                                e.key ===
+                                "Escape"
+                              ) {
+                                setEditingCardId(
+                                  null
+                                );
+                              }
+                            }}
+                            onClick={(
+                              e
+                            ) =>
+                              e.stopPropagation()
+                            }
+                          />
+                        ) : (
+                          <span
+                            onDoubleClick={(
+                              e
+                            ) => {
+                              e.stopPropagation();
 
-                            goToCard(
+                              setEditingCardId(
+                                card.id
+                              );
+
+                              setEditText(
+                                card.title
+                              );
+                            }}
+                          >
+                            {
                               card.title
-                            ); // IMPORTANT: opens card page
-                          }}
-                        >
-                          →
-                        </button>
+                            }
+                          </span>
+                        )}
+
+                        <div className="card-actions">
+                          <button
+                            className="delete-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+
+                              deleteCard(
+                                column.id,
+                                card.id,
+                                card.title
+                              );
+                            }}
+                            title="Delete card"
+                          >
+                            ×
+                          </button>
+
+                          <button
+                            className="card-arrow"
+                            onClick={(e) => {
+                              e.stopPropagation();
+
+                              goToCard(
+                                card.title
+                              );
+                            }}
+                          >
+                            →
+                          </button>
+                        </div>
                       </div>
                     )
                   )}
