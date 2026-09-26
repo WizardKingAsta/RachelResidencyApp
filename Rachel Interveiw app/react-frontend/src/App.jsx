@@ -8,6 +8,9 @@ import {
   signInWithEmailAndPassword,
 } from "firebase/auth";
 
+import AnikaLoadingImage from "./assets/Anika_loading.png?inline";
+import KaiLoadingImage from "./assets/Kai_loading.png?inline";
+
 import "./App.css";
 
 import { auth } from "./firebase.js";
@@ -29,7 +32,7 @@ import useBoard from "./hooks/useBoard.js";
   Firebase confirms that a user is signed in.
 */
 export default function App() {
-  const loading_paths = ["../public/Anika_loading.png","../public/Kai_loading.png"];
+  const loading_images = [AnikaLoadingImage,KaiLoadingImage];
   const [user, setUser] =
     useState(null);
 
@@ -92,7 +95,7 @@ export default function App() {
   return (
     <div className="card-page loading-page">
       <img
-        src={loading_paths[rand_pic]}
+        src={loading_images[rand_pic]}
         alt="Loading"
         className="loading-image"
       />
