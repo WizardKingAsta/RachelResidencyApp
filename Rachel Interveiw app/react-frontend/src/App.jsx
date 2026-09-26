@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import  CardPage from "./pages/card-page.jsx"
+import {} from "./components/card.jsx"
 
 const initialTabs = [
   {
@@ -15,8 +16,6 @@ const initialTabs = [
     ],
   },
 ];
-
-
 
 export default function App() {
   const [tabs, setTabs] = useState(() => {
@@ -646,34 +645,7 @@ export default function App() {
       <main className="board-wrapper">
         {activeTab && (
           <div className="tab-controls">
-            <div className="add-column">
-              <input
-                type="text"
-                placeholder="New column..."
-                value={
-                  newColumnTitle
-                }
-                onChange={(e) =>
-                  setNewColumnTitle(
-                    e.target.value
-                  )
-                }
-                onKeyDown={(e) => {
-                  if (
-                    e.key ===
-                    "Enter"
-                  ) {
-                    addColumn();
-                  }
-                }}
-              />
-
-              <button
-                onClick={addColumn}
-              >
-                + Add Column
-              </button>
-            </div>
+            
           </div>
         )}
 
@@ -693,6 +665,7 @@ export default function App() {
                   )
                 }
               >
+                
                 <div className="column-header">
                   {editingColumnId ===
                   column.id ? (
@@ -754,7 +727,7 @@ export default function App() {
                       }
                     </h2>
                   )}
-
+                  
                   <div className="column-header-actions">
                     <span>
                       {
@@ -776,7 +749,7 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-
+                      
                 <div className="cards">
                   {column.cards.map(
                     (card) => (
@@ -797,6 +770,7 @@ export default function App() {
                           )
                         }
                       >
+                        
                         {editingCardId ===
                         card.id ? (
                           <input
@@ -952,6 +926,25 @@ export default function App() {
               </section>
             )
           )}
+          <div className="add-column-inline">
+  <div className="add-column">
+    <input
+      type="text"
+      placeholder="New column..."
+      value={newColumnTitle}
+      onChange={(e) => setNewColumnTitle(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          addColumn();
+        }
+      }}
+    />
+
+    <button onClick={addColumn}>
+      + Add Column
+    </button>
+  </div>
+</div>
         </div>
       </main>
     </div>

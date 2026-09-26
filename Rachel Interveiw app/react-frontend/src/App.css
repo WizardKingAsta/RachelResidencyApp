@@ -676,4 +676,10 @@ header h1 {
   display: flex;
   align-items: center;
   gap: 8px;
+
+}
+.add-column-inline {
+  min-width: 320px;
+  padding-top: 14px;
+  flex-shrink: 0;
 }
