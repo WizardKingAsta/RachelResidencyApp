@@ -13,7 +13,7 @@ body,
 body {
   font-family: Inter, Arial, sans-serif;
   color: #fff;
-  overflow: hidden;
+  overflow-y: auto;
   background:
     radial-gradient(circle at 20% 20%, rgba(107, 70, 255, 0.4), transparent 28%),
     radial-gradient(circle at 80% 30%, rgba(255, 79, 163, 0.35), transparent 30%),
@@ -31,7 +31,7 @@ input {
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 /* soft glowing background blobs */
@@ -425,7 +425,7 @@ header h1 {
   padding: 40px;
   min-height: 100vh; /* IMPORTANT: prevents the background from cutting off */
   box-sizing: border-box;
-
+  overflow-y: auto;
   background: inherit;
 }
 
