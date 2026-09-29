@@ -1,6 +1,158 @@
-import {useEffect,useState,} from "react";
-import {doc,getDoc,setDoc,} from "firebase/firestore";
+import {useEffect,useRef,useState,} from "react";
+import {doc,getDoc,runTransaction,serverTimestamp,} from "firebase/firestore";
 import { rachel_db } from "../firebase.js";
+
+const BOARD_KEY = "tabs";
+const ACTIVE_TAB_KEY = "activeTabId";
+
+const BACKUPS_KEY = "tabs-backups-v1";
+const SYNC_META_KEY = "board-sync-meta-v1";
+const LAST_GOOD_KEY = "tabs-last-known-good";
+const CONFLICT_KEY = "board-sync-conflict-v1";
+
+const MAX_BACKUPS = 50;
+
+
+const safeParse = (
+  value,
+  fallback
+) => {
+  try {
+    return value
+      ? JSON.parse(value)
+      : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+
+const getSyncMeta = () => {
+  return safeParse(
+    localStorage.getItem(
+      SYNC_META_KEY
+    ),
+    {
+      dirty: false,
+      lastSyncedRevision: 0,
+    }
+  );
+};
+
+
+const updateSyncMeta = (
+  updates
+) => {
+  const current =
+    getSyncMeta();
+
+  localStorage.setItem(
+    SYNC_META_KEY,
+    JSON.stringify({
+      ...current,
+      ...updates,
+    })
+  );
+};
+
+
+/*
+  Saves a full previous version before
+  anything destructive can replace it.
+*/
+const saveBackupSnapshot = (
+  tabs,
+  activeTabId,
+  reason
+) => {
+  if (!Array.isArray(tabs)) {
+    return;
+  }
+
+  try {
+    const backups =
+      safeParse(
+        localStorage.getItem(
+          BACKUPS_KEY
+        ),
+        []
+      );
+
+    const newest =
+      backups[0];
+
+    /*
+      Avoid storing 50 identical copies.
+    */
+    const sameAsNewest =
+      newest &&
+      JSON.stringify(
+        newest.tabs
+      ) ===
+        JSON.stringify(tabs) &&
+      newest.activeTabId ===
+        activeTabId;
+
+    if (sameAsNewest) {
+      return;
+    }
+
+    const snapshot = {
+      id: crypto.randomUUID(),
+      savedAt:
+        new Date().toISOString(),
+      reason,
+      activeTabId,
+      tabs,
+    };
+
+    const updated = [
+      snapshot,
+      ...backups,
+    ].slice(
+      0,
+      MAX_BACKUPS
+    );
+
+    localStorage.setItem(
+      BACKUPS_KEY,
+      JSON.stringify(updated)
+    );
+  } catch (error) {
+    console.error(
+      "Could not create local backup:",
+      error
+    );
+  }
+};
+
+
+const backupCurrentLocal = (
+  reason
+) => {
+  const tabs =
+    safeParse(
+      localStorage.getItem(
+        BOARD_KEY
+      ),
+      null
+    );
+
+  if (!tabs) {
+    return;
+  }
+
+  const activeTabId =
+    localStorage.getItem(
+      ACTIVE_TAB_KEY
+    ) || "main";
+
+  saveBackupSnapshot(
+    tabs,
+    activeTabId,
+    reason
+  );
+};
 
 const initialTabs = [
   {
@@ -17,6 +169,23 @@ const initialTabs = [
 ];
 
 export default function useBoard() {
+const pendingSavesRef =
+  useRef(0);
+
+    const skipNextSaveRef =
+  useRef(false);
+
+/*
+  Serializes Firestore saves.
+
+  This prevents two rapid edits on this
+  device from racing each other.
+*/
+const saveQueueRef =
+  useRef(
+    Promise.resolve()
+  );
+
   const [tabs, setTabs] =
     useState(() => {
       const savedTabs =
@@ -70,57 +239,192 @@ export default function useBoard() {
     Firebase is treated as the source
     of truth if a board already exists.
   */
+
   useEffect(() => {
-    const loadBoard = async () => {
-      try {
-        const snapshot =
-          await getDoc(
-            doc(
-              rachel_db,
-              "boards",
-              "main"
-            )
-          );
-        
-        if (snapshot.exists()) {
-          const data =
-            snapshot.data();
+  let cancelled = false;
 
-          if (data.tabs) {
-            setTabs(
-              data.tabs
-            );
-          }
+  const loadBoard = async () => {
+    try {
+      const boardRef =
+        doc(
+          rachel_db,
+          "boards",
+          "main"
+        );
 
-          if (
-            data.activeTabId
-          ) {
-            setActiveTabId(
-              data.activeTabId
-            );
-          }
-        }
-      } catch (error) {
-        console.error(
-          "Could not load board from Firebase:",
-          error
+      const snapshot =
+        await getDoc(
+          boardRef
+        );
+
+      if (cancelled) {
+        return;
+      }
+
+
+      /*
+        Nothing exists in Firestore yet.
+
+        Keep our local board.
+        It will be uploaded by the
+        normal save effect below.
+      */
+      if (!snapshot.exists()) {
+        return;
+      }
+
+
+      const remote =
+        snapshot.data();
+
+      const remoteRevision =
+        Number(
+          remote.revision ??
+            0
+        );
+
+      const meta =
+        getSyncMeta();
+
+      const localTabs =
+        safeParse(
+          localStorage.getItem(
+            BOARD_KEY
+          ),
+          null
+        );
+
+      const localActiveTabId =
+        localStorage.getItem(
+          ACTIVE_TAB_KEY
+        ) || "main";
+
+
+      /*
+        CRITICAL FAILSAFE:
+
+        If this browser has changes that
+        never successfully reached Firebase,
+        NEVER replace them with Firebase.
+      */
+      if (
+        meta.dirty &&
+        localTabs
+      ) {
+        console.warn(
+          "Local unsynced changes found. Preserving local board."
         );
 
         /*
-          IMPORTANT:
-          If Firebase fails,
-          the localStorage state
-          loaded above remains usable.
+          Keep a copy of the cloud state too,
+          so neither side can be lost.
         */
-      } finally {
+        if (remote.tabs) {
+          saveBackupSnapshot(
+            remote.tabs,
+            remote.activeTabId ||
+              "main",
+            "cloud-copy-while-local-unsynced"
+          );
+        }
+
+        return;
+      }
+
+
+      /*
+        We're about to let Firebase replace
+        localStorage.
+
+        Back up local FIRST.
+      */
+      if (localTabs) {
+        saveBackupSnapshot(
+          localTabs,
+          localActiveTabId,
+          "before-firestore-load"
+        );
+      }
+
+
+      /*
+        Prevent the Firestore hydration
+        itself from immediately triggering
+        another cloud write.
+      */
+      skipNextSaveRef.current =
+        true;
+
+
+      if (remote.tabs) {
+        setTabs(
+          remote.tabs
+        );
+
+        localStorage.setItem(
+          BOARD_KEY,
+          JSON.stringify(
+            remote.tabs
+          )
+        );
+      }
+
+
+      if (
+        remote.activeTabId
+      ) {
+        setActiveTabId(
+          remote.activeTabId
+        );
+
+        localStorage.setItem(
+          ACTIVE_TAB_KEY,
+          remote.activeTabId
+        );
+      }
+
+
+      /*
+        This local copy is known to match
+        Firestore revision N.
+      */
+      updateSyncMeta({
+        dirty: false,
+
+        lastSyncedRevision:
+          remoteRevision,
+      });
+
+    } catch (error) {
+      console.error(
+        "Could not load board from Firebase:",
+        error
+      );
+
+      /*
+        We intentionally do NOTHING
+        destructive here.
+
+        Whatever is in localStorage stays.
+      */
+
+    } finally {
+      if (!cancelled) {
         setFirebaseLoaded(
           true
         );
       }
-    };
+    }
+  };
 
-    loadBoard();
-  }, []);
+
+  loadBoard();
+
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   /*
     SAVE LOCALLY + FIREBASE
@@ -133,47 +437,320 @@ export default function useBoard() {
     could overwrite existing cloud data.
   */
   useEffect(() => {
-    if (!firebaseLoaded) {
-      return;
+  if (!firebaseLoaded) {
+    return;
+  }
+
+
+  /*
+    Firestore just hydrated this state.
+
+    Don't immediately write the exact same
+    data back to Firestore.
+  */
+  if (
+    skipNextSaveRef.current
+  ) {
+    skipNextSaveRef.current =
+      false;
+
+    return;
+  }
+
+
+  /*
+    -------------------------
+    LOCAL SAVE
+    -------------------------
+
+    Backup the PREVIOUS local version
+    before replacing it.
+  */
+  const previousTabs =
+    safeParse(
+      localStorage.getItem(
+        BOARD_KEY
+      ),
+      null
+    );
+
+  const previousActiveTabId =
+    localStorage.getItem(
+      ACTIVE_TAB_KEY
+    ) || "main";
+
+
+  if (previousTabs) {
+    const changed =
+      JSON.stringify(
+        previousTabs
+      ) !==
+        JSON.stringify(tabs) ||
+      previousActiveTabId !==
+        activeTabId;
+
+    if (changed) {
+      saveBackupSnapshot(
+        previousTabs,
+        previousActiveTabId,
+        "before-local-save"
+      );
     }
+  }
 
-    localStorage.setItem(
-      "tabs",
-      JSON.stringify(tabs)
-    );
 
-    localStorage.setItem(
-      "activeTabId",
-      activeTabId
-    );
+  /*
+    localStorage is synchronous.
 
-    const saveBoard = async () => {
-      try {
-        await setDoc(
+    Save here BEFORE attempting any
+    network operation.
+  */
+  localStorage.setItem(
+    BOARD_KEY,
+    JSON.stringify(tabs)
+  );
+
+  localStorage.setItem(
+    ACTIVE_TAB_KEY,
+    activeTabId
+  );
+
+
+  /*
+    Until Firestore confirms otherwise,
+    consider this local copy UNSYNCED.
+  */
+  updateSyncMeta({
+    dirty: true,
+  });
+
+
+  /*
+    -------------------------
+    FIRESTORE SAVE
+    -------------------------
+
+    Queue saves so rapid edits cannot race
+    against one another on this device.
+  */
+ pendingSavesRef.current += 1;
+  saveQueueRef.current =
+    saveQueueRef.current.then(
+      async () => {
+        const boardRef =
           doc(
             rachel_db,
             "boards",
             "main"
-          ),
-          {
-            tabs,
-            activeTabId,
-          }
-        );
-      } catch (error) {
-        console.error(
-          "Could not save board to Firebase:",
-          error
-        );
-      }
-    };
+          );
 
-    saveBoard();
-  }, [
-    tabs,
-    activeTabId,
-    firebaseLoaded,
-  ]);
+
+        try {
+          const newRevision =
+            await runTransaction(
+              rachel_db,
+              async (
+                transaction
+              ) => {
+                const remoteSnapshot =
+                  await transaction.get(
+                    boardRef
+                  );
+
+                const meta =
+                  getSyncMeta();
+
+                const remoteRevision =
+                  remoteSnapshot.exists()
+                    ? Number(
+                        remoteSnapshot.data()
+                          .revision ??
+                          0
+                      )
+                    : 0;
+
+
+                /*
+                  CONFLICT DETECTION
+
+                  Another device changed the
+                  board since this browser
+                  last successfully synced.
+
+                  DO NOT overwrite it.
+                */
+                if (
+                  remoteSnapshot.exists() &&
+                  remoteRevision !==
+                    Number(
+                      meta.lastSyncedRevision ??
+                        0
+                    )
+                ) {
+                  const error =
+                    new Error(
+                      "BOARD_SYNC_CONFLICT"
+                    );
+
+                  error.remoteData =
+                    remoteSnapshot.data();
+
+                  throw error;
+                }
+
+
+                const nextRevision =
+                  remoteRevision +
+                  1;
+
+
+                transaction.set(
+                  boardRef,
+                  {
+                    tabs,
+                    activeTabId,
+
+                    revision:
+                      nextRevision,
+
+                    updatedAt:
+                      serverTimestamp(),
+                  }
+                );
+
+
+                return nextRevision;
+              }
+            );
+
+
+          /*
+            Firebase confirmed the write.
+          */
+          pendingSavesRef.current -= 1;
+
+updateSyncMeta({
+  // Only mark clean when EVERY queued local change has reached Firebase.
+  dirty:
+    pendingSavesRef.current > 0,
+
+  lastSyncedRevision:
+    newRevision,
+});
+
+
+          /*
+            Separate known-good recovery
+            point.
+
+            Only updated after Firebase has
+            successfully committed.
+          */
+          localStorage.setItem(
+            LAST_GOOD_KEY,
+            JSON.stringify({
+              savedAt:
+                new Date().toISOString(),
+
+              revision:
+                newRevision,
+
+              activeTabId,
+
+              tabs,
+            })
+          );
+
+
+          /*
+            Clear an old conflict once
+            we've successfully synchronized.
+          */
+          localStorage.removeItem(
+            CONFLICT_KEY
+          );
+
+
+          console.log(
+            "Board safely synced. Revision:",
+            newRevision
+          );
+
+        } catch (error) {
+             pendingSavesRef.current =
+    Math.max(
+      0,
+      pendingSavesRef.current - 1
+    );
+
+          /*
+            Another device changed Firestore.
+
+            Save BOTH versions rather than
+            choosing one automatically.
+          */
+          if (
+            error.message ===
+            "BOARD_SYNC_CONFLICT"
+          ) {
+            console.error(
+              "Board sync conflict detected. Nothing was overwritten."
+            );
+
+
+            const remote =
+              error.remoteData;
+
+
+            if (remote?.tabs) {
+              saveBackupSnapshot(
+                remote.tabs,
+                remote.activeTabId ||
+                  "main",
+                "firestore-conflict-copy"
+              );
+            }
+
+
+            localStorage.setItem(
+              CONFLICT_KEY,
+              JSON.stringify({
+                detectedAt:
+                  new Date().toISOString(),
+
+                local: {
+                  tabs,
+                  activeTabId,
+                },
+
+                remote:
+                  remote || null,
+              })
+            );
+
+            return;
+          }
+
+
+          /*
+            Network error / permission error /
+            Firebase outage.
+
+            Local data remains intact and
+            marked dirty.
+          */
+          console.error(
+            "Firestore save failed. Local copy preserved:",
+            error
+          );
+        }
+      }
+    );
+}, [
+  tabs,
+  activeTabId,
+  firebaseLoaded,
+]);
 
   const activeTab =
     tabs.find(

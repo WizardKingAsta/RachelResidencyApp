@@ -1,22 +1,233 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef,useState } from "react";
 import "../App.css";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import {rachel_db,} from "../firebase.js";
 
+const EMPTY_NOTES = {
+  interviews: "",
+  fit: "",
+  pdQuestions: "",
+  residentQuestions: "",
+};
+
+
+const safeParse = (
+  value,
+  fallback
+) => {
+  try {
+    return value
+      ? JSON.parse(value)
+      : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 export default function CardPage({ cardTitle }) {
-  const storageKey = `card-notes-${cardTitle}`;
+  const storageKey =
+  `card-notes-${cardTitle}`;
 
-  const [notes, setNotes] = useState(() => {
-    const savedNotes = localStorage.getItem(storageKey);
+const backupKey =
+  `card-notes-backup-${cardTitle}`;
 
-    return savedNotes
-      ? JSON.parse(savedNotes)
-      : {
-          interviews: "",
-          fit: "",
-          pdQuestions: "",
-          residentQuestions: "",
-        };
+const syncKey =
+  `card-notes-sync-${cardTitle}`;
+
+const lastGoodKey =
+  `card-notes-last-good-${cardTitle}`;
+
+
+/*
+  encodeURIComponent is important because
+  Firestore document IDs cannot safely use
+  arbitrary card titles containing "/".
+*/
+const firestoreId =
+  encodeURIComponent(cardTitle);
+
+  const [notes, setNotes] =
+  useState(() => {
+    return safeParse(
+      localStorage.getItem(
+        storageKey
+      ),
+      EMPTY_NOTES
+    );
   });
+
+
+const [firebaseLoaded, setFirebaseLoaded] =
+  useState(false);
+
+
+/*
+  Prevent Firestore hydration from
+  immediately triggering another save.
+*/
+const skipNextSaveRef =
+  useRef(false);
+
+
+/*
+  Used to debounce Firestore writes.
+*/
+const saveTimerRef =
+  useRef(null);
+  useEffect(() => {
+  let cancelled = false;
+
+
+  const loadNotes = async () => {
+    try {
+      const noteRef =
+        doc(
+          rachel_db,
+          "cardNotes",
+          firestoreId
+        );
+
+
+      const snapshot =
+        await getDoc(noteRef);
+
+
+      if (
+        cancelled ||
+        !snapshot.exists()
+      ) {
+        return;
+      }
+
+
+      const remote =
+        snapshot.data();
+
+
+      const localNotes =
+        safeParse(
+          localStorage.getItem(
+            storageKey
+          ),
+          null
+        );
+
+
+      const syncMeta =
+        safeParse(
+          localStorage.getItem(
+            syncKey
+          ),
+          {
+            dirty: false,
+          }
+        );
+
+
+      /*
+        CRITICAL:
+
+        Local changes exist that Firebase
+        has not confirmed.
+
+        Never overwrite them.
+      */
+      if (
+        syncMeta.dirty &&
+        localNotes
+      ) {
+        console.warn(
+          "Unsynced card notes found. Keeping local copy."
+        );
+
+        return;
+      }
+
+
+      /*
+        Save local version BEFORE
+        replacing it with cloud data.
+      */
+      if (localNotes) {
+        localStorage.setItem(
+          backupKey,
+          JSON.stringify({
+            savedAt:
+              new Date().toISOString(),
+
+            notes:
+              localNotes,
+          })
+        );
+      }
+
+
+      const remoteNotes =
+        remote.notes ??
+        EMPTY_NOTES;
+
+
+      skipNextSaveRef.current =
+        true;
+
+
+      setNotes(
+        remoteNotes
+      );
+
+
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify(
+          remoteNotes
+        )
+      );
+
+
+      localStorage.setItem(
+        syncKey,
+        JSON.stringify({
+          dirty: false,
+        })
+      );
+
+    } catch (error) {
+      /*
+        Do NOT touch local notes when
+        Firebase fails.
+      */
+      console.error(
+        "Could not load card notes:",
+        error
+      );
+
+    } finally {
+      if (!cancelled) {
+        setFirebaseLoaded(
+          true
+        );
+      }
+    }
+  };
+
+
+  loadNotes();
+
+
+  return () => {
+    cancelled = true;
+  };
+}, [
+  firestoreId,
+  storageKey,
+  backupKey,
+  syncKey,
+]);
 
   const handleChange = (field, value) => {
     const updatedNotes = {
@@ -31,6 +242,196 @@ export default function CardPage({ cardTitle }) {
       JSON.stringify(updatedNotes)
     );
   };
+  useEffect(() => {
+  if (!firebaseLoaded) {
+    return;
+  }
+
+
+  /*
+    This update came FROM Firebase.
+
+    Don't immediately send it
+    back to Firebase.
+  */
+  if (
+    skipNextSaveRef.current
+  ) {
+    skipNextSaveRef.current =
+      false;
+
+    return;
+  }
+
+
+  /*
+    Get previous local version before
+    replacing it.
+  */
+  const previousNotes =
+    safeParse(
+      localStorage.getItem(
+        storageKey
+      ),
+      null
+    );
+
+
+  if (
+    previousNotes &&
+    JSON.stringify(
+      previousNotes
+    ) !==
+      JSON.stringify(notes)
+  ) {
+    /*
+      Emergency previous-version backup.
+    */
+    localStorage.setItem(
+      backupKey,
+      JSON.stringify({
+        savedAt:
+          new Date().toISOString(),
+
+        notes:
+          previousNotes,
+      })
+    );
+  }
+
+
+  /*
+    SAVE LOCAL IMMEDIATELY.
+
+    This happens synchronously before
+    touching the network.
+  */
+  localStorage.setItem(
+    storageKey,
+    JSON.stringify(notes)
+  );
+
+
+  /*
+    Assume unsynced until Firestore
+    explicitly confirms the write.
+  */
+  localStorage.setItem(
+    syncKey,
+    JSON.stringify({
+      dirty: true,
+    })
+  );
+
+
+  /*
+    Reset debounce timer whenever
+    she types another character.
+  */
+  if (
+    saveTimerRef.current
+  ) {
+    clearTimeout(
+      saveTimerRef.current
+    );
+  }
+
+
+  saveTimerRef.current =
+    setTimeout(
+      async () => {
+        try {
+          const noteRef =
+            doc(
+              rachel_db,
+              "cardNotes",
+              firestoreId
+            );
+
+
+          await setDoc(
+            noteRef,
+            {
+              cardTitle,
+
+              notes,
+
+              updatedAt:
+                serverTimestamp(),
+            }
+          );
+
+
+          /*
+            Firestore confirmed the save.
+          */
+          localStorage.setItem(
+            syncKey,
+            JSON.stringify({
+              dirty: false,
+            })
+          );
+
+
+          /*
+            Known-good version.
+
+            Only updated after Firestore
+            confirms success.
+          */
+          localStorage.setItem(
+            lastGoodKey,
+            JSON.stringify({
+              savedAt:
+                new Date().toISOString(),
+
+              notes,
+            })
+          );
+
+
+          console.log(
+            "Card notes safely synced:",
+            cardTitle
+          );
+
+        } catch (error) {
+          /*
+            Leave dirty=true.
+
+            LocalStorage remains intact.
+          */
+          console.error(
+            "Could not sync card notes. Local copy preserved:",
+            error
+          );
+        }
+      },
+
+      600
+    );
+
+
+  return () => {
+    if (
+      saveTimerRef.current
+    ) {
+      clearTimeout(
+        saveTimerRef.current
+      );
+    }
+  };
+
+}, [
+  notes,
+  firebaseLoaded,
+  storageKey,
+  backupKey,
+  syncKey,
+  lastGoodKey,
+  firestoreId,
+  cardTitle,
+]);
 
   return (
     <div className="card-page">
