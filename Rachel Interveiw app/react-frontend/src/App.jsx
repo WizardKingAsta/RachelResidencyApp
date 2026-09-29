@@ -236,28 +236,50 @@ function BoardApp() {
   if (
     hash.startsWith("#card/")
   ) {
-    const cardTitle =
-      decodeURIComponent(
-        window.location.hash.replace(
-          "#card/",
-          ""
-        )
+     const cardId =
+    hash.replace(
+      "#card/",
+      ""
+    );
+
+  const card =
+    tabs
+      .flatMap(
+        (tab) =>
+          tab.columns
+      )
+      .flatMap(
+        (column) =>
+          column.cards
+      )
+      .find(
+        (card) =>
+          card.id === cardId
       );
 
+  if (!card) {
     return (
-      <CardPage
-        cardTitle={cardTitle}
-      />
+      <div className="card-page">
+        Card not found.
+      </div>
     );
   }
 
+  return (
+    <CardPage
+      cardId={card.id}
+      cardTitle={card.title}
+    />
+  );
+}
+
 
   const goToCard = (
-    cardTitle
+    cardId
   ) => {
     window.location.hash =
       `card/${encodeURIComponent(
-        cardTitle
+        cardId
       )}`;
 
     window.location.reload();

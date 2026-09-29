@@ -112,7 +112,7 @@ export default function Card({
           onClick={(e) => {
             e.stopPropagation();
 
-            onOpen(card.title);
+            onOpen(card.id);
           }}
         >
           →

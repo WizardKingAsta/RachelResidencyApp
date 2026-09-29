@@ -29,18 +29,18 @@ const safeParse = (
   }
 };
 
-export default function CardPage({ cardTitle }) {
+export default function CardPage({ cardId, cardTitle }) {
   const storageKey =
-  `card-notes-${cardTitle}`;
+  `card-notes-${cardId}`;
 
 const backupKey =
-  `card-notes-backup-${cardTitle}`;
+  `card-notes-backup-${cardId}`;
 
 const syncKey =
-  `card-notes-sync-${cardTitle}`;
+  `card-notes-sync-${cardId}`;
 
 const lastGoodKey =
-  `card-notes-last-good-${cardTitle}`;
+  `card-notes-last-good-${cardId}`;
 
 
 /*
@@ -48,8 +48,7 @@ const lastGoodKey =
   Firestore document IDs cannot safely use
   arbitrary card titles containing "/".
 */
-const firestoreId =
-  encodeURIComponent(cardTitle);
+const firestoreId =cardId;
 
   const [notes, setNotes] =
   useState(() => {
@@ -229,19 +228,17 @@ const saveTimerRef =
   syncKey,
 ]);
 
-  const handleChange = (field, value) => {
-    const updatedNotes = {
-      ...notes,
+  const handleChange = (
+  field,
+  value
+) => {
+  setNotes(
+    (current) => ({
+      ...current,
       [field]: value,
-    };
-
-    setNotes(updatedNotes);
-
-    localStorage.setItem(
-      storageKey,
-      JSON.stringify(updatedNotes)
-    );
-  };
+    })
+  );
+};
   useEffect(() => {
   if (!firebaseLoaded) {
     return;
