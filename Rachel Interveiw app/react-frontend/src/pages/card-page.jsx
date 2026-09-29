@@ -437,7 +437,7 @@ const saveTimerRef =
       <button
         onClick={() => {
           window.location.hash = "";
-          window.location.reload();
+          
         }}
       >
         ← Back

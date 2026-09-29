@@ -230,8 +230,30 @@ function BoardApp() {
   /*
     CARD PAGE ROUTING
   */
-  const hash =
-    window.location.hash;
+  const [hash, setHash] =
+  useState(
+    window.location.hash
+  );
+
+  useEffect(() => {
+  const handleHashChange = () => {
+    setHash(
+      window.location.hash
+    );
+  };
+
+  window.addEventListener(
+    "hashchange",
+    handleHashChange
+  );
+
+  return () => {
+    window.removeEventListener(
+      "hashchange",
+      handleHashChange
+    );
+  };
+}, []);
 
   if (
     hash.startsWith("#card/")
@@ -275,16 +297,11 @@ function BoardApp() {
 
 
   const goToCard = (
-    cardId
-  ) => {
-    window.location.hash =
-      `card/${encodeURIComponent(
-        cardId
-      )}`;
-
-    window.location.reload();
-  };
-
+  cardId
+) => {
+  window.location.hash =
+    `card/${cardId}`;
+};
 
   /*
     ADD TAB UI HANDLER
