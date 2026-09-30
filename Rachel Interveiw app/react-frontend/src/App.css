@@ -514,7 +514,7 @@ header h1 {
     0 12px 30px rgba(0, 0, 0, 0.22);
 }
 
-.card-page > button {
+.card-page-button {
   padding: 10px 14px;
 
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -743,4 +743,67 @@ header h1 {
 
 .column-move-option:hover {
   background: rgba(255, 105, 180, 0.14);
+}
+.card-description {
+  display: flex;
+  justify-content: center;
+
+  margin: 10px auto 24px auto;
+
+  background: none;
+  border: none;
+  padding: 0;
+  backdrop-filter: none;
+}
+
+.card-description textarea {
+  width: min(450px, 90%);
+  height: 90px;
+  resize: none;
+}
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.header-button {
+  position: absolute;
+  left: calc(50% + 200px);
+}
+
+
+.strategic-tooltip {
+  position: absolute;
+
+  left: 50%;
+  bottom: calc(100% + 4px);
+
+  transform: translateX(-50%);
+
+  width: 320px;
+  max-width: 85vw;
+
+  padding: 14px 16px;
+
+  background: rgba(28, 18, 42, 0.98);
+  color: rgba(255, 255, 255, 0.95);
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+
+  box-shadow:
+    0 14px 35px rgba(0, 0, 0, 0.35);
+
+  backdrop-filter: blur(12px);
+
+  font-size: 0.9rem;
+  line-height: 1.5;
+
+  white-space: pre-wrap;
+
+  z-index: 9999;
+
+  pointer-events: none;
 }

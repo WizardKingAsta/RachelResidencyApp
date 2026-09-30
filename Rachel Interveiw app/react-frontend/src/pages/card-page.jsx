@@ -9,6 +9,7 @@ import {
 import {rachel_db,} from "../firebase.js";
 
 const EMPTY_NOTES = {
+  strategicInfo:"",
   interviews: "",
   fit: "",
   pdQuestions: "",
@@ -434,9 +435,9 @@ const saveTimerRef =
 
   return (
     <div className="card-page">
-      <h1>{cardTitle}</h1>
-
-      <button
+      <div className="card-title-row">
+        <h1>{cardTitle}</h1>
+         <button className="card-page-button header-button"
         onClick={() => {
           window.location.hash = "";
           
@@ -444,6 +445,23 @@ const saveTimerRef =
       >
         ← Back
       </button>
+      </div>
+      
+
+        <div className="card-description">
+          <textarea
+            placeholder="Strategic info"
+            value={notes.strategicInfo}
+            onChange={(e) =>
+              handleChange(
+                "strategicInfo",
+                e.target.value
+              )
+            }
+          />
+        </div>
+
+     
 
       <div className="card-sections">
         <div className="card-section">
