@@ -683,3 +683,64 @@ header h1 {
   padding-top: 14px;
   flex-shrink: 0;
 }
+.column-move-button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+
+  color: #f4d7ff;
+
+  width: 30px;
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease,
+    border-color 0.2s ease;
+}
+.column-move-wrapper {
+  position: relative;
+}
+
+.column-move-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+
+  min-width: 160px;
+  padding: 6px;
+
+  background: rgba(30, 15, 45, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+
+  backdrop-filter: blur(12px);
+
+  z-index: 1000;
+}
+
+.column-move-option {
+  display: block;
+  width: 100%;
+
+  padding: 8px 10px;
+
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+
+  color: #f4d7ff;
+  text-align: left;
+
+  cursor: pointer;
+}
+
+.column-move-option:hover {
+  background: rgba(255, 105, 180, 0.14);
+}

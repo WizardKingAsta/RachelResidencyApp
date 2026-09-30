@@ -201,6 +201,7 @@ function BoardApp() {
     addColumn,
     deleteColumn,
     renameColumn,
+    moveColumnToTab,
 
     addCard,
     deleteCard,
@@ -437,6 +438,10 @@ function BoardApp() {
                 column={
                   column
                 }
+                  tabs={tabs}
+                  activeTabId={activeTabId}
+                  
+                onMoveColumn={moveColumnToTab}
 
                 newCardTitle={
                   newCardTitles[
@@ -468,6 +473,7 @@ function BoardApp() {
                 onDeleteColumn={
                   deleteColumn
                 }
+                
 
                 onRenameCard={
                   renameCard

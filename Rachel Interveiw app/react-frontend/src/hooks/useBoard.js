@@ -852,6 +852,7 @@ updateSyncMeta({
   // COLUMNS
   // -------------------------
 
+  //Function to add a column
   const addColumn = (
     title
   ) => {
@@ -882,6 +883,7 @@ updateSyncMeta({
     );
   };
 
+  //Function to delete a column
   const deleteColumn = (
     columnId
   ) => {
@@ -924,6 +926,7 @@ updateSyncMeta({
     );
   };
 
+  //Function to rename a column
   const renameColumn = (
     columnId,
     newTitle
@@ -956,6 +959,72 @@ updateSyncMeta({
       )
     );
   };
+  
+  //Function to move a column from one tab to another
+  const moveColumnToTab = (
+  columnId,
+  targetTabId
+) => {
+  if (
+    !activeTabId ||
+    !targetTabId ||
+    activeTabId === targetTabId
+  ) {
+    return;
+  }
+
+  setTabs((prev) => {
+    const sourceTab =
+      prev.find(
+        (tab) =>
+          tab.id === activeTabId
+      );
+
+    const columnToMove =
+      sourceTab?.columns.find(
+        (column) =>
+          column.id === columnId
+      );
+
+    if (!columnToMove) {
+      return prev;
+    }
+
+    return prev.map(
+      (tab) => {
+        if (
+          tab.id === activeTabId
+        ) {
+          return {
+            ...tab,
+
+            columns:
+              tab.columns.filter(
+                (column) =>
+                  column.id !==
+                  columnId
+              ),
+          };
+        }
+
+        if (
+          tab.id === targetTabId
+        ) {
+          return {
+            ...tab,
+
+            columns: [
+              ...tab.columns,
+              columnToMove,
+            ],
+          };
+        }
+
+        return tab;
+      }
+    );
+  });
+};
 
   // -------------------------
   // CARDS
@@ -1269,6 +1338,7 @@ updateSyncMeta({
     addColumn,
     deleteColumn,
     renameColumn,
+    moveColumnToTab,
 
     addCard,
     deleteCard,

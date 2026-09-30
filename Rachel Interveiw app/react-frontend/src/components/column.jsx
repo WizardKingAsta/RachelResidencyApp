@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState,useRef,useEffect} from "react";
 
 import Card from "./card.jsx";
 
@@ -14,12 +14,48 @@ export default function Column({
   onOpenCard,
   onDragStart,
   onDrop,
+  tabs,
+  activeTabId,
+  onMoveColumn,
 }) {
   const [isEditing, setIsEditing] =
     useState(false);
 
   const [editText, setEditText] =
     useState(column.title);
+
+  const [showMoveMenu,setShowMoveMenu,] = useState(false);
+
+  const moveMenuRef =useRef(null);
+
+  //Function to close column move drop down if someone clicks outside of it
+  useEffect(() => {
+  const handleClickOutside = (
+    event
+  ) => {
+    if (
+      showMoveMenu &&
+      moveMenuRef.current &&
+      !moveMenuRef.current.contains(
+        event.target
+      )
+    ) {
+      setShowMoveMenu(false);
+    }
+  };
+
+  document.addEventListener(
+    "mousedown",
+    handleClickOutside
+  );
+
+  return () => {
+    document.removeEventListener(
+      "mousedown",
+      handleClickOutside
+    );
+  };
+}, [showMoveMenu]);
 
   const saveRename = () => {
     const title = editText.trim();
@@ -101,7 +137,52 @@ export default function Column({
             {column.cards.length}
           </span>
 
-          <button
+                  <div className="column-move-wrapper"
+                  ref={moveMenuRef}>
+
+  <button
+    className="column-move-button"
+    onClick={() =>
+      setShowMoveMenu(
+        (prev) => !prev
+      )
+    }
+    title="Move column"
+  >
+    ⇄
+  </button>
+
+  {showMoveMenu && (
+    <div className="column-move-menu">
+      {tabs
+        .filter(
+          (tab) =>
+            tab.id !== activeTabId
+        )
+        .map(
+          (tab) => (
+            <button
+              key={tab.id}
+              className="column-move-option"
+              onClick={() => {
+                onMoveColumn(
+                  column.id,
+                  tab.id
+                );
+
+                setShowMoveMenu(
+                  false
+                );
+              }}
+            >
+              {tab.title}
+            </button>
+          )
+        )}
+    </div>
+  )}
+</div>
+  <button
             className="delete-button"
             onClick={() =>
               onDeleteColumn(

@@ -13,6 +13,8 @@ const EMPTY_NOTES = {
   fit: "",
   pdQuestions: "",
   residentQuestions: "",
+  staffQuestions:"",
+  postInterviewNotes:""
 };
 
 
@@ -498,6 +500,36 @@ const saveTimerRef =
             onChange={(e) =>
               handleChange(
                 "residentQuestions",
+                e.target.value
+              )
+            }
+          />
+        </div>
+
+        <div className="card-section">
+          <h2>Questions for Staff</h2>
+
+          <textarea
+            placeholder="Questions for residents..."
+            value={notes.staffQuestions}
+            onChange={(e) =>
+              handleChange(
+                "staffQuestions",
+                e.target.value
+              )
+            }
+          />
+        </div>
+
+        <div className="card-section">
+          <h2>Post Interview Notes</h2>
+
+          <textarea
+            placeholder="Notes after big sis CRUSHED IT..."
+            value={notes.postInterviewNotes}
+            onChange={(e) =>
+              handleChange(
+                "postInterviewNotes",
                 e.target.value
               )
             }
