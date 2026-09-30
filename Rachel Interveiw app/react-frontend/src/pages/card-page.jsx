@@ -510,7 +510,7 @@ const saveTimerRef =
           <h2>Questions for Staff</h2>
 
           <textarea
-            placeholder="Questions for residents..."
+            placeholder="Questions for staff..."
             value={notes.staffQuestions}
             onChange={(e) =>
               handleChange(
