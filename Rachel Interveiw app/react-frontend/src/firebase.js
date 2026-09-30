@@ -19,11 +19,7 @@ const firebaseConfig = {
 
 };
 
-if(import.meta.env.VITE_FIREBASE_PROJECT_ID == "rachel-residency-db"){
-     throw new Error(
-    "SAFETY STOP: localhost is using production Firebase."
-  );
-}
+
 
 
 // Initialize Firebase
