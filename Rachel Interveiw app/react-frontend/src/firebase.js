@@ -19,7 +19,12 @@ const firebaseConfig = {
 
 };
 
-
+//Saftey statement to check if we are local or in prod
+if(import.meta.env.DEV && import.meta.env.VITE_FIREBASE_PROJECT_ID == "rachel-residency-db"){
+     throw new Error(
+    "SAFETY STOP: localhost is using production Firebase."
+  );
+}
 
 
 // Initialize Firebase
