@@ -429,7 +429,8 @@ header h1 {
   background: inherit;
 }
 
-.card-page textarea {
+.card-page textarea 
+.card-page .rich-text-content{
   display: block;
   width: 100%;
   max-width: 700px;
@@ -476,7 +477,8 @@ header h1 {
   filter: brightness(1.1);
 }
 
-.card-page textarea {
+.card-page textarea,
+.card-page .rich-text-content{
   background:
     linear-gradient(
       135deg,
@@ -554,11 +556,15 @@ header h1 {
 }
 
 .card-section {
-  min-width: 420px; /* IMPORTANT: stops them from shrinking and stacking */
-  flex-shrink: 0;
+  width: 420px;
+  min-width: 420px;
+  max-width: 420px;
+
+  flex: 0 0 420px;
 }
 
-.card-section textarea {
+.card-section textarea,
+.card-section .rich-text-content {
   width: 100%;
   height: calc(100vh - 300px); /* IMPORTANT: stretches close to bottom of page */
 }
@@ -759,7 +765,37 @@ header h1 {
 .card-description textarea {
   width: min(450px, 90%);
   height: 90px;
+
+  margin-top: 20px;
+  padding: 12px;
+
+  font-size: 16px;
+
   resize: none;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(91, 111, 255, 0.16),
+      rgba(197, 73, 255, 0.12),
+      rgba(255, 98, 165, 0.10)
+    );
+
+  color: white;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.14);
+
+  border-radius: 18px;
+
+  outline: none;
+
+  box-shadow:
+    inset 0 1px 0
+      rgba(255, 255, 255, 0.08),
+    0 12px 30px
+      rgba(0, 0, 0, 0.22);
 }
 .card-title-row {
   display: flex;
@@ -806,4 +842,255 @@ header h1 {
   z-index: 9999;
 
   pointer-events: none;
+}/* =========================
+   RICH TEXT TOOLBAR
+   ========================= */
+
+.rich-text-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+
+  gap: 6px;
+
+  width: 100%;
+
+  padding: 8px 10px;
+  margin: 0;
+
+  background:
+    rgba(10, 10, 24, 0.28);
+
+  border: none;
+  border-bottom:
+    1px solid
+    rgba(255, 255, 255, 0.10);
+
+  border-radius: 0;
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Base toolbar button */
+.rich-text-toolbar .editor-tool {
+  min-width: 32px;
+  height: 32px;
+
+  padding: 4px 8px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(255, 255, 255, 0.08);
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+
+  color: #f4d7ff;
+
+  box-shadow: none;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+/* Hover */
+.rich-text-toolbar .editor-tool:hover {
+  background: rgba(255, 105, 180, 0.16);
+
+  border-color: rgba(255, 105, 180, 0.32);
+
+  transform: translateY(-1px);
+}
+
+
+/* Active formatting */
+.rich-text-toolbar .editor-tool.active {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(114, 80, 255, 0.95),
+      rgba(239, 84, 183, 0.95)
+    );
+
+  border-color: rgba(255, 190, 245, 0.7);
+
+  color: white;
+
+  box-shadow:
+    0 5px 14px rgba(119, 76, 255, 0.24),
+    0 5px 16px rgba(255, 82, 168, 0.16);
+}
+
+
+/* Font-size dropdown */
+.editor-select {
+  height: 32px;
+
+  padding: 4px 9px;
+
+  background: rgba(255, 255, 255, 0.08);
+
+  color: #f4d7ff;
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+
+  outline: none;
+
+  cursor: pointer;
+}
+
+
+/* Dropdown hover/focus */
+.editor-select:hover,
+.editor-select:focus {
+  background: rgba(255, 105, 180, 0.12);
+
+  border-color: rgba(255, 105, 180, 0.30);
+}
+
+
+.editor-select option {
+  background: #21142f;
+  color: white;
+}
+
+
+/* Color picker */
+.editor-color {
+  width: 32px;
+  height: 32px;
+
+  padding: 3px;
+
+  background: rgba(255, 255, 255, 0.08);
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+
+  cursor: pointer;
+}
+
+
+.editor-color:hover {
+  border-color: rgba(255, 105, 180, 0.30);
+}
+
+
+.editor-color::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+
+.editor-color::-webkit-color-swatch {
+  border: none;
+  border-radius: 5px;
+}
+.editor-color::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+.rich-text-toolbar {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.rich-text-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+  text-align: left;
+}
+
+/* =========================
+   RICH TEXT EDITOR SHELL
+   Makes toolbar + editor one visual unit
+   ========================= */
+
+.rich-text-editor {
+  width: 100%;
+  max-width: 100%;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.14);
+
+  border-radius: 18px;
+
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(91, 111, 255, 0.16),
+      rgba(197, 73, 255, 0.12),
+      rgba(255, 98, 165, 0.10)
+    );
+
+  box-shadow:
+    inset 0 1px 0
+      rgba(255, 255, 255, 0.08),
+    0 12px 30px
+      rgba(0, 0, 0, 0.22);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  min-width: 0;
+}
+.rich-text-editor
+.rich-text-content {
+  width: 100%;
+  max-width: 100%;
+
+  margin: 0;
+
+  border: none;
+  border-radius: 0;
+
+  background: transparent;
+  padding: 12px 13px;
+
+  box-shadow: none;
+
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+
+  overflow-x: hidden;
+
+  text-align: left;
+}
+.rich-text-editor:focus-within {
+  border-color:
+    rgba(210, 160, 255, 0.75);
+
+  box-shadow:
+    0 0 0 3px
+      rgba(163, 105, 255, 0.12),
+    0 12px 30px
+      rgba(0, 0, 0, 0.22);
+}
+.rich-text-content
+p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+
+  color: rgba(255, 255, 255, 0.42);
+
+  float: left;
+
+  height: 0;
+
+  pointer-events: none;
+
+  font-style: normal;
 }

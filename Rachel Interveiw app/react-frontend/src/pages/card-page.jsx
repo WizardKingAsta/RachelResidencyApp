@@ -1,11 +1,7 @@
 import { useEffect, useRef,useState } from "react";
 import "../App.css";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import RichTextEditor from "../components/RichTextEditor.jsx";
+import {doc,getDoc,setDoc,serverTimestamp,} from "firebase/firestore";
 import {rachel_db,} from "../firebase.js";
 
 const EMPTY_NOTES = {
@@ -467,13 +463,13 @@ const saveTimerRef =
         <div className="card-section">
           <h2>Info on the Program</h2>
 
-          <textarea
+          <RichTextEditor
             placeholder="Notes about interviews..."
             value={notes.interviews}
-            onChange={(e) =>
+            onChange={(value) =>
               handleChange(
                 "interviews",
-                e.target.value
+                value
               )
             }
           />
@@ -482,13 +478,13 @@ const saveTimerRef =
         <div className="card-section">
           <h2>How I Fit In</h2>
 
-          <textarea
+          <RichTextEditor
             placeholder="How do I fit into this program?"
             value={notes.fit}
-            onChange={(e) =>
+            onChange={(value) =>
               handleChange(
                 "fit",
-                e.target.value
+                value
               )
             }
           />
@@ -497,13 +493,13 @@ const saveTimerRef =
         <div className="card-section">
           <h2>Questions for PDs</h2>
 
-          <textarea
+          <RichTextEditor
             placeholder="Questions for program directors..."
             value={notes.pdQuestions}
-            onChange={(e) =>
+            onChange={(value) =>
               handleChange(
                 "pdQuestions",
-                e.target.value
+                value
               )
             }
           />
@@ -512,13 +508,13 @@ const saveTimerRef =
         <div className="card-section">
           <h2>Questions for Residents</h2>
 
-          <textarea
+          <RichTextEditor
             placeholder="Questions for residents..."
             value={notes.residentQuestions}
-            onChange={(e) =>
+            onChange={(value) =>
               handleChange(
                 "residentQuestions",
-                e.target.value
+                value
               )
             }
           />
@@ -527,13 +523,13 @@ const saveTimerRef =
         <div className="card-section">
           <h2>Questions for Staff</h2>
 
-          <textarea
+          <RichTextEditor
             placeholder="Questions for staff..."
             value={notes.staffQuestions}
-            onChange={(e) =>
+            onChange={(value) =>
               handleChange(
                 "staffQuestions",
-                e.target.value
+                value
               )
             }
           />
@@ -542,13 +538,13 @@ const saveTimerRef =
         <div className="card-section">
           <h2>Post Interview Notes</h2>
 
-          <textarea
+          <RichTextEditor
             placeholder="Notes after big sis CRUSHED IT..."
             value={notes.postInterviewNotes}
-            onChange={(e) =>
+            onChange={(value) =>
               handleChange(
                 "postInterviewNotes",
-                e.target.value
+                value
               )
             }
           />
