@@ -22,6 +22,8 @@ import Column from "./components/column.jsx";
 
 import useBoard from "./hooks/useBoard.js";
 
+import useInterviewMilestone from "./hooks/useInterviewMilestone.js";
+
 
 /*
   APP
@@ -85,7 +87,7 @@ export default function App() {
     }
   };
 
-
+  
   /*
     Wait until Firebase has determined
     whether a session already exists.
@@ -211,6 +213,8 @@ function BoardApp() {
     handleDrop,
   } = useBoard();
 
+  /*Import easter egg logic*/ 
+  const {showTenInterviewPopup,closeTenInterviewPopup,} = useInterviewMilestone(tabs);
 
   const [
     newTabTitle,
@@ -440,7 +444,7 @@ function BoardApp() {
                 }
                   tabs={tabs}
                   activeTabId={activeTabId}
-                  
+
                 onMoveColumn={moveColumnToTab}
 
                 newCardTitle={
@@ -534,7 +538,37 @@ function BoardApp() {
             </div>
           )}
         </div>
+        
+        {showTenInterviewPopup && (
+  <div className="milestone-overlay">
+    <div className="milestone-popup">
+      <button
+        className="milestone-close"
+        onClick={
+          closeTenInterviewPopup
+        }
+      >
+        ×
+      </button>
+
+      <h2>
+        10 INTERVIEWS 🎉
+      </h2>
+      <h3> (click full screen, bottom right of vid)</h3>
+
+      <video
+        src={
+          `../public/easter-eggs/10_interviews_easter_egg.mov`
+        }
+        controls
+        autoPlay
+      />
+    </div>
+  </div>
+)}
       </main>
     </div>
+    
   );
+  
 }
