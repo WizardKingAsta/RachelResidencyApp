@@ -24,8 +24,8 @@ function countInterviewCards(tabs) {
             column.title
               ?.trim()
               .toLowerCase()
-              .startsWith(
-                "interviews"
+              .includes(
+                "interview"
               );
 
           if (!isInterviewColumn) {
