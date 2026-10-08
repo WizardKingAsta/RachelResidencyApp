@@ -23,6 +23,7 @@ function countInterviewCards(tabs) {
           const isInterviewColumn =
             column.title
               ?.trim()
+              .toLowerCase()
               .startsWith(
                 "Interview"
               );
