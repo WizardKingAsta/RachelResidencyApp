@@ -194,6 +194,10 @@ function BoardApp() {
     activeTabId,
     activeTab,
 
+  boardConflict,
+  resolveConflictUseLocal,
+  resolveConflictUseRemote,
+
     setActiveTabId,
 
     addTab,
@@ -403,7 +407,87 @@ function BoardApp() {
           </button>
         </div>
       </header>
+      {boardConflict && (
+  <div className="conflict-overlay">
+    <div className="conflict-modal">
+      <div className="conflict-icon">
+        ⚠️
+      </div>
 
+      <h2>
+        Board sync conflict
+      </h2>
+
+      <p className="conflict-description">
+        This device and the cloud both
+        contain different changes.
+      </p>
+
+      <p className="conflict-warning">
+        Nothing has been overwritten.
+        Choose which version you want to keep.
+      </p>
+
+      <div className="conflict-actions">
+        <button
+          className="conflict-button conflict-local"
+          onClick={async () => {
+            const confirmed =
+              window.confirm(
+                "Keep THIS DEVICE'S board? The current cloud version will be backed up first."
+              );
+
+            if (confirmed) {
+              await resolveConflictUseLocal();
+            }
+          }}
+        >
+          <span>
+            💻
+          </span>
+
+          <div>
+            <strong>
+              Keep this device
+            </strong>
+
+            <small>
+              Push the board currently shown here to the cloud
+            </small>
+          </div>
+        </button>
+
+        <button
+          className="conflict-button conflict-cloud"
+          onClick={async () => {
+            const confirmed =
+              window.confirm(
+                "Use the CLOUD board? This device's current version will be backed up first."
+              );
+
+            if (confirmed) {
+              await resolveConflictUseRemote();
+            }
+          }}
+        >
+          <span>
+            ☁️
+          </span>
+
+          <div>
+            <strong>
+              Use cloud version
+            </strong>
+
+            <small>
+              Replace this device with the latest Firestore board
+            </small>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       <div className="tabs">
         {tabs.map(

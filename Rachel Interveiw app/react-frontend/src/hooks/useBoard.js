@@ -39,6 +39,7 @@ const getSyncMeta = () => {
   );
 };
 
+/*Gets the synced meta data ofr firestore board*/
 
 const updateSyncMeta = (
   updates
@@ -54,6 +55,16 @@ const updateSyncMeta = (
     })
   );
 };
+
+
+/*Check if boards are eqqual based on contents*/
+const boardsAreEqual = (tabsA,tabsB) => {
+  return (
+    JSON.stringify(tabsA) ===
+    JSON.stringify(tabsB)
+  );
+};
+
 
 
 /*
@@ -234,6 +245,18 @@ const saveQueueRef =
     setFirebaseLoaded,
   ] = useState(false);
 
+  /*add variable for board conlfict*/
+  const [
+  boardConflict,
+  setBoardConflict,
+] = useState(() => {
+  return safeParse(
+    localStorage.getItem(
+      CONFLICT_KEY
+    ),
+    null
+  );
+});
   /*
     LOAD FROM FIREBASE ON STARTUP
 
@@ -396,6 +419,24 @@ const saveQueueRef =
           remoteRevision,
       });
 
+      localStorage.setItem(
+  LAST_GOOD_KEY,
+  JSON.stringify({
+    savedAt:
+      new Date().toISOString(),
+
+    revision:
+      remoteRevision,
+
+    activeTabId:
+      remote.activeTabId ||
+      localActiveTabId,
+
+    tabs:
+      remote.tabs,
+  })
+);
+
     } catch (error) {
       console.error(
         "Could not load board from Firebase:",
@@ -525,6 +566,103 @@ const saveQueueRef =
     dirty: true,
   });
 
+  const existingConflict =
+  safeParse(
+    localStorage.getItem(
+      CONFLICT_KEY
+    ),
+    null
+  );
+
+if (existingConflict) {
+  const conflictRemoteTabs =
+    existingConflict.remote?.tabs;
+
+
+  /*
+    If the user manually changed LOCAL
+    back so that it matches the remote
+    version we originally conflicted with,
+    the conflict no longer exists.
+
+    Clear the latch and allow the normal
+    Firestore transaction below to verify
+    against CURRENT Firestore.
+  */
+  const conflictResolvedLocally =
+    Array.isArray(
+      conflictRemoteTabs
+    ) &&
+    boardsAreEqual(
+      tabs,
+      conflictRemoteTabs
+    );
+
+
+  if (conflictResolvedLocally) {
+    console.log(
+      "Local board now matches conflict remote snapshot. Rechecking Firestore."
+    );
+
+
+    localStorage.removeItem(
+      CONFLICT_KEY
+    );
+
+
+    setBoardConflict(
+      null
+    );
+
+
+    /*
+      IMPORTANT:
+      Do NOT return.
+
+      Fall through to the normal
+      Firestore transaction below.
+
+      That transaction will fetch CURRENT
+      Firestore and make sure this is
+      actually safe.
+    */
+  } else {
+    /*
+      Real conflict is still unresolved.
+
+      Keep saving new LOCAL edits into the
+      conflict snapshot, but do not touch
+      Firestore yet.
+    */
+    const updatedConflict = {
+      ...existingConflict,
+
+      updatedAt:
+        new Date().toISOString(),
+
+      local: {
+        tabs,
+        activeTabId,
+      },
+    };
+
+
+    localStorage.setItem(
+      CONFLICT_KEY,
+      JSON.stringify(
+        updatedConflict
+      )
+    );
+
+
+    setBoardConflict(
+      updatedConflict
+    );
+
+
+    return;
+  }
+}
 
   /*
     -------------------------
@@ -547,7 +685,7 @@ const saveQueueRef =
 
 
         try {
-          const newRevision =
+          const result =
             await runTransaction(
               rachel_db,
               async (
@@ -581,22 +719,150 @@ const saveQueueRef =
                   DO NOT overwrite it.
                 */
                 if (
-                  remoteSnapshot.exists() &&
-                  remoteRevision !==
-                    Number(
-                      meta.lastSyncedRevision ??
-                        0
-                    )
-                ) {
-                  const error =
-                    new Error(
-                      "BOARD_SYNC_CONFLICT"
+                    remoteSnapshot.exists() &&
+                    remoteRevision !==
+                        Number(
+                        meta.lastSyncedRevision ?? 0
+                        )
+                    ) {
+                    const remoteData =
+                        remoteSnapshot.data();
+
+
+                /*
+                    BASE = last board Firestore
+                    successfully confirmed for us.
+                */
+                const lastGood =
+                    safeParse(
+                    localStorage.getItem(
+                        LAST_GOOD_KEY
+                    ),
+                    null
                     );
 
-                  error.remoteData =
-                    remoteSnapshot.data();
 
-                  throw error;
+                const baseTabs =
+                    lastGood?.tabs;
+
+
+                const localMatchesRemote =
+                    boardsAreEqual(
+                    tabs,
+                    remoteData.tabs
+                    );
+
+
+                    /*
+                        CASE 1:
+                        The revisions differ, but the
+                        actual board is identical.
+
+                        Nothing meaningful conflicted.
+                    */
+                    if (localMatchesRemote) {
+                        return {
+                        revision:
+                            remoteRevision,
+
+                        action:
+                            "already-current",
+
+                        remoteData,
+                        };
+                    }
+
+
+                    /*
+                        We cannot safely perform a
+                        three-way comparison without
+                        knowing our BASE.
+
+                        Fall back to conservative conflict
+                        handling rather than guessing.
+                    */
+                    if (!baseTabs) {
+                        const error =
+                        new Error(
+                            "BOARD_SYNC_CONFLICT"
+                        );
+
+                        error.remoteData =
+                        remoteData;
+
+                        throw error;
+                    }
+
+
+                    const remoteMatchesBase =
+                        boardsAreEqual(
+                        remoteData.tabs,
+                        baseTabs
+                        );
+
+
+                    const localMatchesBase =
+                        boardsAreEqual(
+                        tabs,
+                        baseTabs
+                        );
+
+
+                /*
+                    CASE 2:
+                    Remote board hasn't actually
+                    changed since our BASE.
+
+                    LOCAL is the only side with
+                    meaningful board changes.
+
+                    Safe to continue below and write it.
+                */
+                if (remoteMatchesBase) {
+                    // deliberately continue
+                }
+
+
+                /*
+                    CASE 3:
+                    LOCAL hasn't changed from BASE,
+                    but remote has.
+
+                    Another device made the only
+                    meaningful board changes.
+
+                    Safely adopt remote.
+                */
+                else if (localMatchesBase) {
+                    return {
+                    revision:
+                        remoteRevision,
+
+                    action:
+                        "adopt-remote",
+
+                    remoteData,
+                    };
+                }
+
+
+                /*
+                    CASE 4:
+                    Both sides changed differently.
+
+                    REAL CONFLICT.
+                */
+                else {
+                    const error =
+                    new Error(
+                        "BOARD_SYNC_CONFLICT"
+                    );
+
+                    error.remoteData =
+                    remoteData;
+
+                    throw error;
+                }
                 }
 
 
@@ -620,7 +886,13 @@ const saveQueueRef =
                 );
 
 
-                return nextRevision;
+               return {
+                revision:
+                    nextRevision,
+
+                action:
+                    "wrote-local",
+                };
               }
             );
 
@@ -628,54 +900,185 @@ const saveQueueRef =
           /*
             Firebase confirmed the write.
           */
-          pendingSavesRef.current -= 1;
+         /*
+  Firebase transaction finished successfully.
+*/
+pendingSavesRef.current =
+  Math.max(
+    0,
+    pendingSavesRef.current - 1
+  );
 
+
+/*
+  CASE: another device changed the board,
+  while our local board had not changed
+  from BASE.
+
+  Safely adopt the newer remote board.
+*/
+if (
+  result.action ===
+  "adopt-remote"
+) {
+  const remote =
+    result.remoteData;
+
+
+  saveBackupSnapshot(
+    tabs,
+    activeTabId,
+    "before-auto-adopt-remote"
+  );
+
+
+  /*
+    Prevent the setTabs/setActiveTabId below
+    from immediately firing another save.
+  */
+  skipNextSaveRef.current =
+    true;
+
+
+  setTabs(
+    remote.tabs
+  );
+
+
+  /*
+    Keep her current tab if it still exists.
+    Otherwise use remote's tab / first tab.
+  */
+  const nextActiveTabId =
+    remote.tabs.some(
+      (tab) =>
+        tab.id === activeTabId
+    )
+      ? activeTabId
+      : (
+          remote.activeTabId ||
+          remote.tabs[0]?.id ||
+          ""
+        );
+
+
+  setActiveTabId(
+    nextActiveTabId
+  );
+
+
+  localStorage.setItem(
+    BOARD_KEY,
+    JSON.stringify(
+      remote.tabs
+    )
+  );
+
+
+  localStorage.setItem(
+    ACTIVE_TAB_KEY,
+    nextActiveTabId
+  );
+
+
+  updateSyncMeta({
+    dirty:
+      pendingSavesRef.current > 0,
+
+    lastSyncedRevision:
+      result.revision,
+  });
+
+
+  localStorage.setItem(
+    LAST_GOOD_KEY,
+    JSON.stringify({
+      savedAt:
+        new Date()
+          .toISOString(),
+
+      revision:
+        result.revision,
+
+      activeTabId:
+        nextActiveTabId,
+
+      tabs:
+        remote.tabs,
+    })
+  );
+
+
+  localStorage.removeItem(
+    CONFLICT_KEY
+  );
+
+  setBoardConflict(
+    null
+  );
+
+
+  console.log(
+    "Remote board safely adopted. Revision:",
+    result.revision
+  );
+
+
+  return;
+}
+
+
+/*
+  CASE:
+  - normal local write
+  OR
+  - revision differed but actual boards
+    were already identical.
+
+  Either way, we now know which Firestore
+  revision this board corresponds to.
+*/
 updateSyncMeta({
-  // Only mark clean when EVERY queued local change has reached Firebase.
   dirty:
     pendingSavesRef.current > 0,
 
   lastSyncedRevision:
-    newRevision,
+    result.revision,
 });
 
 
-          /*
-            Separate known-good recovery
-            point.
+localStorage.setItem(
+  LAST_GOOD_KEY,
+  JSON.stringify({
+    savedAt:
+      new Date().toISOString(),
 
-            Only updated after Firebase has
-            successfully committed.
-          */
-          localStorage.setItem(
-            LAST_GOOD_KEY,
-            JSON.stringify({
-              savedAt:
-                new Date().toISOString(),
+    revision:
+      result.revision,
 
-              revision:
-                newRevision,
+    activeTabId,
 
-              activeTabId,
-
-              tabs,
-            })
-          );
+    tabs,
+  })
+);
 
 
-          /*
-            Clear an old conflict once
-            we've successfully synchronized.
-          */
-          localStorage.removeItem(
-            CONFLICT_KEY
-          );
+localStorage.removeItem(
+  CONFLICT_KEY
+);
+
+setBoardConflict(
+  null
+);
 
 
-          console.log(
-            "Board safely synced. Revision:",
-            newRevision
-          );
+console.log(
+  result.action ===
+    "already-current"
+    ? "Board already matched Firestore. Metadata self-healed. Revision:"
+    : "Board safely synced. Revision:",
+  result.revision
+);
 
         } catch (error) {
              pendingSavesRef.current =
@@ -713,23 +1116,34 @@ updateSyncMeta({
             }
 
 
-            localStorage.setItem(
-              CONFLICT_KEY,
-              JSON.stringify({
-                detectedAt:
-                  new Date().toISOString(),
+            const conflict = {
+  detectedAt:
+    new Date().toISOString(),
 
-                local: {
-                  tabs,
-                  activeTabId,
-                },
+  local: {
+    tabs,
+    activeTabId,
+  },
 
-                remote:
-                  remote || null,
-              })
-            );
+  remote:
+    remote || null,
+};
 
-            return;
+
+localStorage.setItem(
+  CONFLICT_KEY,
+  JSON.stringify(
+    conflict
+  )
+);
+
+
+setBoardConflict(
+  conflict
+);
+
+
+return;
           }
 
 
@@ -752,6 +1166,357 @@ updateSyncMeta({
   activeTabId,
   firebaseLoaded,
 ]);
+    const resolveConflictUseLocal =
+  async () => {
+    const conflict =
+      boardConflict ||
+      safeParse(
+        localStorage.getItem(
+          CONFLICT_KEY
+        ),
+        null
+      );
+
+
+    if (!conflict) {
+      console.log(
+        "No board conflict to resolve."
+      );
+
+      return false;
+    }
+
+
+    try {
+      /*
+        Finish anything already queued
+        before making the explicit choice.
+      */
+      await saveQueueRef.current;
+
+
+      const boardRef =
+        doc(
+          rachel_db,
+          "boards",
+          "main"
+        );
+
+
+      const result =
+        await runTransaction(
+          rachel_db,
+
+          async (
+            transaction
+          ) => {
+            const snapshot =
+              await transaction.get(
+                boardRef
+              );
+
+
+            const remote =
+              snapshot.exists()
+                ? snapshot.data()
+                : null;
+
+
+            const remoteRevision =
+              Number(
+                remote?.revision ??
+                0
+              );
+
+
+            const nextRevision =
+              remoteRevision + 1;
+
+
+            /*
+              EXPLICIT HUMAN DECISION:
+              this device's current board wins.
+            */
+            transaction.set(
+              boardRef,
+              {
+                tabs,
+                activeTabId,
+
+                revision:
+                  nextRevision,
+
+                updatedAt:
+                  serverTimestamp(),
+              }
+            );
+
+
+            return {
+              revision:
+                nextRevision,
+
+              replacedRemote:
+                remote,
+            };
+          }
+        );
+
+
+      /*
+        Preserve the exact cloud board
+        that we intentionally replaced.
+      */
+      if (
+        result.replacedRemote
+          ?.tabs
+      ) {
+        saveBackupSnapshot(
+          result.replacedRemote.tabs,
+
+          result.replacedRemote
+            .activeTabId ||
+            "main",
+
+          "remote-before-local-wins"
+        );
+      }
+
+
+      updateSyncMeta({
+        dirty: false,
+
+        lastSyncedRevision:
+          result.revision,
+      });
+
+
+      localStorage.setItem(
+        LAST_GOOD_KEY,
+        JSON.stringify({
+          savedAt:
+            new Date()
+              .toISOString(),
+
+          revision:
+            result.revision,
+
+          activeTabId,
+
+          tabs,
+        })
+      );
+
+
+      localStorage.removeItem(
+        CONFLICT_KEY
+      );
+
+
+      setBoardConflict(
+        null
+      );
+
+
+      console.log(
+        "Conflict resolved: LOCAL board chosen. Revision:",
+        result.revision
+      );
+
+
+      return true;
+
+    } catch (error) {
+      console.error(
+        "Could not resolve conflict using local board. Local data was preserved:",
+        error
+      );
+
+
+      return false;
+    }
+  };
+  const resolveConflictUseRemote =
+  async () => {
+    const conflict =
+      boardConflict ||
+      safeParse(
+        localStorage.getItem(
+          CONFLICT_KEY
+        ),
+        null
+      );
+
+
+    if (!conflict) {
+      console.log(
+        "No board conflict to resolve."
+      );
+
+      return false;
+    }
+
+
+    try {
+      /*
+        Make sure an older save isn't still
+        running before choosing cloud.
+      */
+      await saveQueueRef.current;
+
+
+      const boardRef =
+        doc(
+          rachel_db,
+          "boards",
+          "main"
+        );
+
+
+      /*
+        Get CURRENT Firestore instead of
+        trusting the possibly-old snapshot
+        stored when conflict was detected.
+      */
+      const snapshot =
+        await getDoc(
+          boardRef
+        );
+
+
+      if (!snapshot.exists()) {
+        throw new Error(
+          "Remote board no longer exists."
+        );
+      }
+
+
+      const remote =
+        snapshot.data();
+
+
+      const remoteRevision =
+        Number(
+          remote.revision ?? 0
+        );
+
+
+      if (!Array.isArray(
+        remote.tabs
+      )) {
+        throw new Error(
+          "Remote board is invalid."
+        );
+      }
+
+
+      /*
+        Preserve LOCAL before intentionally
+        replacing it.
+      */
+      saveBackupSnapshot(
+        tabs,
+        activeTabId,
+        "local-before-remote-wins"
+      );
+
+
+      skipNextSaveRef.current =
+        true;
+
+
+      setTabs(
+        remote.tabs
+      );
+
+
+      const nextActiveTabId =
+        remote.tabs.some(
+          (tab) =>
+            tab.id === activeTabId
+        )
+          ? activeTabId
+          : (
+              remote.activeTabId ||
+              remote.tabs[0]?.id ||
+              ""
+            );
+
+
+      setActiveTabId(
+        nextActiveTabId
+      );
+
+
+      localStorage.setItem(
+        BOARD_KEY,
+        JSON.stringify(
+          remote.tabs
+        )
+      );
+
+
+      localStorage.setItem(
+        ACTIVE_TAB_KEY,
+        nextActiveTabId
+      );
+
+
+      updateSyncMeta({
+        dirty: false,
+
+        lastSyncedRevision:
+          remoteRevision,
+      });
+
+
+      localStorage.setItem(
+        LAST_GOOD_KEY,
+        JSON.stringify({
+          savedAt:
+            new Date()
+              .toISOString(),
+
+          revision:
+            remoteRevision,
+
+          activeTabId:
+            nextActiveTabId,
+
+          tabs:
+            remote.tabs,
+        })
+      );
+
+
+      localStorage.removeItem(
+        CONFLICT_KEY
+      );
+
+
+      setBoardConflict(
+        null
+      );
+
+
+      console.log(
+        "Conflict resolved: REMOTE board chosen. Revision:",
+        remoteRevision
+      );
+
+
+      return true;
+
+    } catch (error) {
+      console.error(
+        "Could not resolve conflict using remote board. Local data was preserved:",
+        error
+      );
+
+
+      return false;
+    }
+  };
 
   const activeTab =
     tabs.find(
@@ -1346,6 +2111,11 @@ updateSyncMeta({
 
     handleDragStart,
     handleDrop,
+
+    boardConflict,
+
+    resolveConflictUseLocal,
+    resolveConflictUseRemote,
 
     firebaseLoaded,
   };
