@@ -558,7 +558,7 @@ function BoardApp() {
 
       <video
         src={
-          `../public/easter-eggs/10_interviews_easter_egg.mov`
+          `/RachelResidencyApp/easter-eggs/10_interviews_easter_egg.mov`
         }
         controls
         autoPlay
