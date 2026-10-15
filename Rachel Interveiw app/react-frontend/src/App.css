@@ -1314,3 +1314,18 @@ p.is-editor-empty:first-child::before {
   background:
     rgba(255, 255, 255, 0.065);
 }
+
+.rich-text-content .note-image {
+  display: block;
+
+  max-width: 100%;
+  max-height: 500px;
+
+  height: auto;
+
+  margin: 14px 0;
+
+  border-radius: 12px;
+
+  object-fit: contain;
+}

@@ -1,24 +1,18 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import {useEffect,useState,} from "react";
 
-import {
-  EditorContent,
-  useEditor,
-   useEditorState,
-} from "@tiptap/react";
+import {EditorContent,useEditor,useEditorState,} from "@tiptap/react";
+import Image from "@tiptap/extension-image";
 
 import StarterKit from "@tiptap/starter-kit";
 
-import {
-  TextStyleKit,
-} from "@tiptap/extension-text-style";
+import {TextStyleKit,} from "@tiptap/extension-text-style";
+
+import {Placeholder,} from "@tiptap/extensions";
+import {ref,uploadBytes,getDownloadURL,} from "firebase/storage";
 
 import {
-  Placeholder,
-} from "@tiptap/extensions";
-
+  storage
+} from "../firebase.js";
 
 /*
   Allows existing string notes to load
@@ -80,12 +74,65 @@ export default function RichTextEditor({
   value,
   onChange,
   placeholder = "Write notes...",
+  cardid
 }) {
   const [
     contentError,
     setContentError,
   ] = useState(false);
 
+
+  //Function to uplaod image
+  const uploadImageFile =
+  async (file) => {
+    if (!file || !cardid) {
+      return null;
+    }
+
+    if (
+      !file.type.startsWith(
+        "image/"
+      )
+    ) {
+      return null;
+    }
+
+    if (
+      file.size >
+      10 * 1024 * 1024
+    ) {
+      window.alert(
+        "Image must be under 10 MB."
+      );
+
+      return null;
+    }
+
+    const safeName =
+      file.name.replace(
+        /[^a-zA-Z0-9._-]/g,
+        "_"
+      );
+
+    const imageRef =
+      ref(
+        storage,
+        `card-images/${cardid}/${crypto.randomUUID()}-${safeName}`
+      );
+
+    await uploadBytes(
+      imageRef,
+      file,
+      {
+        contentType:
+          file.type,
+      }
+    );
+
+    return await getDownloadURL(
+      imageRef
+    );
+  };
 
   const editor = useEditor({
     /*
@@ -119,6 +166,15 @@ export default function RichTextEditor({
       Placeholder.configure({
         placeholder,
       }),
+
+      //Add extension for images
+      Image.configure({
+    inline: false,
+    allowBase64: false,
+    HTMLAttributes: {
+      class: "note-image",
+    },
+  })
     ],
 
 
@@ -139,13 +195,86 @@ export default function RichTextEditor({
 
 
     editorProps: {
+        
       attributes: {
         class: "rich-text-content",
 
         spellcheck: "true",
       },
-    },
+      handlePaste: (view, event) => {
+  const clipboard = event.clipboardData;
 
+  if (!clipboard) {
+    return false;
+  }
+
+  const imageFile = Array.from(
+    clipboard.files || []
+  ).find((file) =>
+    file.type.startsWith("image/")
+  );
+
+  const imageItem = Array.from(
+    clipboard.items || []
+  ).find((item) =>
+    item.type.startsWith("image/")
+  );
+
+  const file =
+    imageFile ||
+    imageItem?.getAsFile();
+
+  if (!file) {
+    return false;
+  }
+
+  event.preventDefault();
+
+  uploadImageFile(file)
+    .then((downloadURL) => {
+      if (!downloadURL) {
+        return;
+      }
+
+      const imageNode =
+        view.state.schema.nodes.image;
+
+      if (!imageNode) {
+        console.error(
+          "Image node is not registered."
+        );
+        return;
+      }
+
+      const transaction =
+        view.state.tr.replaceSelectionWith(
+          imageNode.create({
+            src: downloadURL,
+            alt:
+              file.name ||
+              "Pasted image",
+          })
+        );
+
+      view.dispatch(transaction);
+      view.focus();
+    })
+    .catch((error) => {
+      console.error(
+        "Pasted image upload failed:",
+        error
+      );
+
+      window.alert(
+        "Could not upload pasted image."
+      );
+    });
+
+  return true;
+},
+    },
+    
+    
 
     /*
       Every edit gives CardPage the
@@ -179,6 +308,46 @@ export default function RichTextEditor({
       editor.setEditable(false);
     },
   });
+
+  const uploadImage =
+  async (file) => {
+    if (!editor) {
+      return;
+    }
+
+    try {
+      const downloadURL =
+        await uploadImageFile(
+          file
+        );
+
+      if (!downloadURL) {
+        return;
+      }
+
+      editor
+        .chain()
+        .focus()
+        .setImage({
+          src:
+            downloadURL,
+
+          alt:
+            file.name,
+        })
+        .run();
+
+    } catch (error) {
+      console.error(
+        "Image upload failed:",
+        error
+      );
+
+      window.alert(
+        "Could not upload image."
+      );
+    }
+  };
 const editorState =
   useEditorState({
     editor,
@@ -203,6 +372,7 @@ const editorState =
     }),
   });
 
+  
   /*
     Your CardPage can replace its state
     after loading Firestore.
@@ -363,7 +533,30 @@ const editorState =
                 A↺
                 </button>
 
+        <label
+  className="card-page-button editor-tool image-upload-button"
+  title="Add image"
+>
+  🖼️
 
+  <input
+    type="file"
+    accept="image/*"
+    hidden
+    onChange={async (e) => {
+      const file =
+        e.target.files?.[0];
+
+      if (file) {
+        await uploadImage(
+          file
+        );
+      }
+
+      e.target.value = "";
+    }}
+  />
+</label>
         <select
           defaultValue=""
           className="editor-select"

@@ -11,7 +11,8 @@ const EMPTY_NOTES = {
   pdQuestions: "",
   residentQuestions: "",
   staffQuestions:"",
-  postInterviewNotes:""
+  postInterviewNotes:"",
+  staffInfo:""
 };
 
 
@@ -454,6 +455,7 @@ const saveTimerRef =
                 e.target.value
               )
             }
+            cardid={cardId}
           />
         </div>
 
@@ -472,6 +474,7 @@ const saveTimerRef =
                 value
               )
             }
+            cardid={cardId}
           />
         </div>
 
@@ -487,6 +490,7 @@ const saveTimerRef =
                 value
               )
             }
+            cardid={cardId}
           />
         </div>
 
@@ -502,6 +506,7 @@ const saveTimerRef =
                 value
               )
             }
+            cardid={cardId}
           />
         </div>
 
@@ -517,6 +522,7 @@ const saveTimerRef =
                 value
               )
             }
+            cardid={cardId}
           />
         </div>
 
@@ -532,6 +538,23 @@ const saveTimerRef =
                 value
               )
             }
+            cardid={cardId}
+          />
+        </div>
+
+        <div className="card-section">
+          <h2>Info on the Staff</h2>
+
+          <RichTextEditor
+            placeholder="Notes about interviews..."
+            value={notes.staffInfo}
+            onChange={(value) =>
+              handleChange(
+                "interviews",
+                value
+              )
+            }
+            cardid={cardId}
           />
         </div>
 
@@ -547,6 +570,7 @@ const saveTimerRef =
                 value
               )
             }
+            cardid={cardId}
           />
         </div>
       </div>
