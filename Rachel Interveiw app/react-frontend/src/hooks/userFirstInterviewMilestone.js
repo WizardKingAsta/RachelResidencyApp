@@ -27,7 +27,7 @@ export default function useFirstInterviewMilestone() {
       async () => {
         const interviewTime =
           new Date(
-            "2026-9-20T18:00:00-05:00"
+            "2026-10-20T18:00:00-05:00"
           );
 
 
