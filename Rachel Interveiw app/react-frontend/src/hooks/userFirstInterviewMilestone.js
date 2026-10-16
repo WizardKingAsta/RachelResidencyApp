@@ -29,7 +29,14 @@ export default function useFirstInterviewMilestone() {
           new Date(
             "2026-10-20T18:00:00-05:00"
           );
-
+          console.log("FIRST INTERVIEW PROD DEBUG", {
+  href: window.location.href,
+  now: new Date().toString(),
+  nowMs: Date.now(),
+  interviewTime: interviewTime.toString(),
+  interviewMs: interviewTime.getTime(),
+  tooEarly: new Date() < interviewTime,
+});
 
         if (
           new Date() <
