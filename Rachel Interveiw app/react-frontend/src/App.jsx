@@ -1,12 +1,6 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import {useEffect,useState,} from "react";
 
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
+import {onAuthStateChanged,signInWithEmailAndPassword,} from "firebase/auth";
 
 import AnikaLoadingImage from "./assets/Anika_loading.png?inline";
 import KaiLoadingImage from "./assets/Kai_loading.png?inline";
@@ -23,6 +17,7 @@ import Column from "./components/column.jsx";
 import useBoard from "./hooks/useBoard.js";
 
 import useInterviewMilestone from "./hooks/useInterviewMilestone.js";
+import useFirstInterviewMilestone from "./hooks/userFirstInterviewMilestone.js";
 
 
 /*
@@ -219,6 +214,9 @@ function BoardApp() {
 
   /*Import easter egg logic*/ 
   const {showTenInterviewPopup,closeTenInterviewPopup,} = useInterviewMilestone(tabs);
+
+  /*Important first interview easter egg logic*/
+  const {showFirstInterviewPopup,closeFirstInterviewPopup,} =useFirstInterviewMilestone();
 
   const [
     newTabTitle,
@@ -647,6 +645,40 @@ function BoardApp() {
         controls
         autoPlay
       />
+    </div>
+  </div>
+)}
+
+  {showFirstInterviewPopup && (
+  <div className="milestone-overlay">
+    <div className="milestone-popup">
+
+      <button
+        className="ilestone-close"
+        onClick={
+          closeFirstInterviewPopup
+        }
+      >
+        ×
+      </button>
+        <h2>
+        FIRST INTERVIEW COMPLETED 🎉
+      </h2>
+      <h3> (click full screen, bottom right of vid)</h3>
+      <video
+        autoPlay
+        controls
+        playsInline
+        preload="auto"
+        className="easter-egg-video"
+      >
+        <source
+          src={`https://firebasestorage.googleapis.com/v0/b/rachel-residency-db.firebasestorage.app/o/easter-eggs%2Ffirst_interview_easteregg.mov?alt=media&token=9c252444-24b5-45e3-9c34-d663d72d7f81`}
+          controls
+        autoPlay
+        />
+      </video>
+
     </div>
   </div>
 )}
