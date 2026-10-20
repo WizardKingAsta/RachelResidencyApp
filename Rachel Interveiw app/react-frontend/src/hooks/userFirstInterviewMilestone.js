@@ -27,7 +27,7 @@ export default function useFirstInterviewMilestone() {
       async () => {
         const interviewTime =
           new Date(
-            "2026-10-20T11:00:00-11:30"
+            "2026-10-20T11:00:00-05:00"
           );
           console.log("FIRST INTERVIEW PROD DEBUG", {
   href: window.location.href,
