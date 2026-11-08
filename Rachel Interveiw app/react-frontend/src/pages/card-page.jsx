@@ -550,7 +550,7 @@ const saveTimerRef =
             value={notes.staffInfo}
             onChange={(value) =>
               handleChange(
-                "interviews",
+                "staffInfo",
                 value
               )
             }
